@@ -41,7 +41,7 @@ ThiefHunter is a bug hunting and penetration testing tool designed to identify s
     - SQLmap for SQL injection testing (https://github.com/sqlmapproject/sqlmap)
     - Dalfox for XSS vulnerability checks (https://github.com/hahwul/dalfox)
     - Nuclei for advanced template-based scans (https://github.com/projectdiscovery/nuclei)
-
+    - Wpscan for advanced wordpress scans (https://github.com/wpscanteam/wpscan)
 
 
 - IP Configuration Check : Validate and display global IP configurations, including Tor-based setups
