@@ -41,7 +41,7 @@ banner = f'''
 ###############################################################################################################
 
 
-# Ignore l'avertissement spécifique
+# pass 'classics' warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 warnings.simplefilter('ignore', urllib3.exceptions.InsecureRequestWarning)
 
@@ -50,7 +50,7 @@ warnings.simplefilter('ignore', urllib3.exceptions.InsecureRequestWarning)
 logging.basicConfig(level=logging.INFO, format=f'{M}[%(levelname)s] {G}%(message)s')
 logger = logging.getLogger(__name__)
 
-# Important HTTP Codes
+# Important HTTP Codes ############# Add more there if needed #############
 REDIRECT_CODES = list(range(300, 311))
 ERROR_CODES = list(range(400, 411))
 
@@ -76,14 +76,9 @@ seen_status_codes = []
 torusage = "no"
 
 def handle_sigint(signal_received, frame):
-    """
-    Cette fonction sera appelée lorsque le programme reçoit un signal SIGINT (Ctrl+C).
-    """
     print(f"\n{R}[Info] Ctrl+C detected. Stoping ...")
-    # Ici vous pouvez ajouter toute logique de nettoyage ou de finalisation.
-    sys.exit(0)  # Sortir proprement du programme
+    sys.exit(0) 
 
-# Associer le gestionnaire de signal SIGINT
 signal.signal(signal.SIGINT, handle_sigint)
 
 
@@ -105,7 +100,7 @@ def check_ips(lanch):
         else:
             proxies = proxies
         
-        # Envoie une requête pour vérifier si Tor est utilisé
+        # send request to Tor for checkin
         response = requests.get("https://check.torproject.org/", proxies=proxies, timeout=30)
 
         if response.status_code == 200:
@@ -212,15 +207,9 @@ def check_ips(lanch):
 
 
 
-
-
-
-
 def loadit(file_path):
-    """Charge les payloads depuis un fichier texte."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            # Lire chaque ligne du fichier et supprimer les espaces inutiles
             payloads = [line.strip() for line in f.readlines()]
         return payloads
     except FileNotFoundError:
@@ -232,7 +221,7 @@ def loadit(file_path):
 
 
 def parse_cookies(cookie_string):
-    # Example implementation: Convert a cookie string into a dictionary
+    # Example implementation : Convert a cookie string into a dictionary
     cookies = {}
     for item in cookie_string.split(";"):
         key, value = item.strip().split("=", 1)
@@ -255,9 +244,8 @@ def help_annex():
     
     filepath = loadit("install_paths/sqlmap.txt")
 
-    # S'assurer que filepath est une chaîne, même s'il vient sous forme de liste
     if isinstance(filepath, list):
-        filepath = filepath[0]  # Prenez le premier élément de la liste                
+        filepath = filepath[0]                
 
 
     if filepath is None:
@@ -279,13 +267,13 @@ def help_annex():
             
             process.stdout.close()
             process.stderr.close()
-            process.wait()  # Wait for the process to finish  
+            process.wait()  
 
 
     filepath = loadit("install_paths/dalfox.txt")
     
     if isinstance(filepath, list):
-        filepath = filepath[0]  # Prenez le premier élément de la liste                
+        filepath = filepath[0]              
     
     if filepath is None:
         print(f"{M}[Info] {G}no dalfox path provided in install_paths/dalfox.txt")
@@ -308,13 +296,13 @@ def help_annex():
             
             process.stdout.close()
             process.stderr.close()
-            process.wait()  # Wait for the process to finish    
+            process.wait()      
 
 
     filepath = loadit("install_paths/nuclei.txt")
     
     if isinstance(filepath, list):
-        filepath = filepath[0]  # Prenez le premier élément de la liste                
+        filepath = filepath[0]                  
     
     if filepath is None:
         print(f"{M}[Info] {G}no nuclei path provided in install_paths/nuclei.txt")
@@ -337,7 +325,37 @@ def help_annex():
             
             process.stdout.close()
             process.stderr.close()
-            process.wait()  # Wait for the process to finish 
+            process.wait()  
+
+
+    filepath = loadit("install_paths/wpscan.txt")
+    
+    if isinstance(filepath, list):
+        filepath = filepath[0]                 
+    
+    if filepath is None:
+        print(f"{M}[Info] {G}no wpscan path provided in install_paths/wpscan.txt")
+    else:
+        print(f"\n\n\n{M}[Info] {G}wpscan help menu (wpscan --help){Y}")
+        print(f"-" * 50)            
+        wpscan_check = check_installation_path(filepath)
+        
+        
+        if wpscan_check == "yes":
+            wpscan_path_expanded = os.path.expanduser(filepath)  
+            process = subprocess.Popen([wpscan_path_expanded, "--help"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            
+            # Capture and print output in real-time
+            for line in iter(process.stdout.readline, ''):
+                print(f"{G}{line.strip()}")
+            
+            for line in iter(process.stderr.readline, ''):
+                print(f"{R}{line.strip()}")
+            
+            process.stdout.close()
+            process.stderr.close()
+            process.wait()  
+
 
 
     print(f"\n\n{M}[Info] {G}Default commands (without parameters){Y}")
@@ -376,13 +394,11 @@ def help_annex():
 def check_tor_connection():
     global torusage, proxies
 
-    # URL de vérification sur Tor Project
     url = "https://check.torproject.org/"
 
     print(f"\n{M}[Info] {C}Checking Tor connexion ...{G}")
     try:
      
-        # Envoie une requête pour vérifier si Tor est utilisé
         response = requests.get(url, proxies=tor_proxies, timeout=30)
 
         if response.status_code == 200:
@@ -494,54 +510,40 @@ def find_sensitive_params(links, params_to_check):
 
 def find_urls_with_params_and_php(links):
     global proxies
-    """
-    Identifie les URLs et détaille les paramètres s'ils existent.
-    Toutes les URLs sont dans la même catégorie, avec un détail des paramètres lorsque présents.
-    Ajoute 'php' comme paramètre si l'URL termine par .php.
-    """
-    seen_links = set()  # Ensemble pour suivre les URLs déjà traitées (évite les doublons)
-    all_urls = []       # Liste finale pour toutes les URLs
+    seen_links = set()  # Avoid duplicates
+    all_urls = []       # URLs final list
 
     for link in links:
         parsed = urlparse(link)
 
-        # Vérifier si l'URL a déjà été traitée
         if link in seen_links:
             continue
 
-        # Liste des paramètres de l'URL
         params = list(parse_qs(parsed.query).keys())
 
-        # Ajouter 'php' aux paramètres si l'URL termine par .php
         if parsed.path.endswith('.php'):
             params.append('php')
 
-        # Ajouter l'URL avec les paramètres détectés
         if params:
             all_urls.append({'url': link, 'params': params})
         else:
-            # Ajoute les URLs sans paramètres
             all_urls.append({'url': link, 'params': None})
 
-        # Marque cette URL comme traitée
         seen_links.add(link)
 
     return all_urls
 
 
 def normalize_url_parameters(urls):
-    """
-    Normalise les paramètres des URLs en remplaçant les valeurs par 'X'.
-    """
     normalized_urls = set()
     
     for url in urls:
         parsed = urlparse(url)
         query_params = parse_qs(parsed.query)
-        # Utilise une compréhension pour remplacer les valeurs par 'X'
+        # Replace values by 'X'
         normalized_query = urlencode({key: 'X' for key in query_params}, doseq=True)
         
-        # Reconstruit l'URL normalisée
+
         normalized_url = urlunparse(parsed._replace(query=normalized_query))
         normalized_urls.add(normalized_url)
     
@@ -569,30 +571,26 @@ def wayback_urls(domain):
             proxies=proxies,
             stream=True
         )
-        urls = set()  # Utiliser un ensemble pour éviter les doublons
+        urls = set()  # Avoid duplicates
         for line in response.iter_lines(decode_unicode=True):
-            # Stop processing if 30 seconds have passed
-            if time.time() - start_time > 30:
+            # Stop processing if 30 seconds have passed 
+            if time.time() - start_time > 30: ############# Changes here (in secondes) #############
                 print(f"{M}[Info] {G}Stopping processing after 30 seconds")
                 break
 
             if line:
-                # Diviser la ligne avec flexibilité
                 parts = line.split(' ')
-                # Nettoyer les champs
                 parts = [part.strip() for part in parts if part.strip()]
 
-                # Vérifier si la ligne a assez de champs pour éviter les erreurs
                 if len(parts) > 4:
-                    # Vérifier le code HTTP et extraire l'URL
                     status_code = parts[4]
                     raw_url = parts[2]
                     
-                    if status_code == '200':  # Si le statut HTTP est 200
-                        clean_url = raw_url.replace('%20', ' ')  # Nettoyer l'URL
-                        urls.add(clean_url)  # Ajouter l'URL nettoyée au set
+                    if status_code == '200':  # Takes only 200 status
+                        clean_url = raw_url.replace('%20', ' ')  # clear URL responses
+                        urls.add(clean_url)  
 
-        return list(urls)  # Retourner les URLs uniques
+        return list(urls)  
     except requests.exceptions.RequestException as e:
         print(f"{M}[Error] {R}Could not fetch Wayback URLs: {e}")
         return []
@@ -604,17 +602,12 @@ def wayback_urls(domain):
 
 
 def detect_login_page(content):
-    """
-    Vérifie si le contenu HTML d'une page contient des indices indiquant une page de connexion.
-    """
     login_keywords = ["login", "connexion", "password", "sign in", "authentication"]
     soup = BeautifulSoup(content, "html.parser")
 
-    # Chercher dans le titre de la page
     if soup.title and any(keyword in soup.title.text.lower() for keyword in login_keywords):
         return True
 
-    # Chercher des champs de formulaire communs dans la page
     if soup.find("input", {"type": "password"}) or soup.find("form", {"action": lambda x: x and "login" in x.lower()}):
         return True
 
@@ -680,7 +673,7 @@ def subreponse(domain):
     print("-" * 50)
     
     for cert in certificates.values():
-        test_url = f"http://{cert['common_name']}"  # Utilisez HTTP par défaut pour tester        
+        test_url = f"http://{cert['common_name']}"  # HTTP default        
         try:
             
             if torusage == "yes":
@@ -739,9 +732,7 @@ def robots(domain, cookies):
     global proxies
     
     base_url = f"https://{domain}"
-    all_urls = set()  # Utiliser un ensemble pour éviter les doublons
-
-    # Traitement du fichier robots.txt
+    all_urls = set()  # Avoid duplicates
     
     try:
         if user_agents == "yes":
@@ -768,10 +759,10 @@ def robots(domain, cookies):
 
         if response.status_code == 200:
             print(f"{M}[Info] {G}Found robots.txt at {robots_url}")
-            # Extraire les chemins "Disallow"
+            # "Disallow" route
             disallow_paths = re.findall(r'^Disallow:\s*(.+)', response.text, re.MULTILINE)
             for path in disallow_paths:
-                if "Sitemap:" in path:  # Ignorer les lignes contenant "Sitemap:"
+                if "Sitemap:" in path:  # Pass "Sitemap:"
                     continue
                 full_url = urljoin(base_url, path.strip())
                 all_urls.add(full_url)
@@ -780,14 +771,13 @@ def robots(domain, cookies):
     except requests.exceptions.RequestException as e:
         print(f"{M}[Error] {R}Error retrieving robots.txt : {e}")
 
-    # Traitement du fichier sitemap.xml
+    # sitemap.xml
     try:
         sitemap_url = urljoin(base_url, "/sitemap.xml")
         response = requests.get(sitemap_url, proxies=proxies, timeout=10)
 
         if response.status_code == 200:
             print(f"{M}[Info] {G}Found sitemap.xml at {sitemap_url}")
-            # Extraire les URLs contenues dans sitemap.xml
             sitemap_urls = re.findall(r'<loc>(.+?)</loc>', response.text)
             for url in sitemap_urls:
                 all_urls.add(url.strip())
@@ -810,18 +800,16 @@ def robots(domain, cookies):
 
 def tag_plugins_themes_and_versions(url):
 
-    # Vérifie si l'URL correspond à un plugin
+    # Plugins
     if '/wp-content/plugins/' in url:
         tag = "[plugin]"
-        # Extraire le nom du plugin
         match = re.search(r'/wp-content/plugins/([^/]+)/', url)
         if match:
             name = match.group(1)
 
-    # Vérifie si l'URL correspond à un thème
+    # Themes
     elif '/wp-content/themes/' in url:
         tag = "[theme] "
-        # Extraire le nom du thème
         match = re.search(r'/wp-content/themes/([^/]+)/', url)
         if match:
             name = match.group(1)
@@ -899,20 +887,13 @@ def detect_plugins_and_themes(soup):
 
 
 def enumerate_users_via_wp_json(url):
-    """
-    Vérifie si le fichier wp-json est accessible, puis énumère tous les utilisateurs.
-    """
     print(f"{M}[Info] {G}Looking for usernames")
     try:
-        # Endpoint des utilisateurs de l'API REST
         api_url = f"{url.rstrip('/')}/wp-json/wp/v2/users"
-        
-        # Requête à l'API REST
         response = requests.get(api_url, timeout=15)
         
         if response.status_code == 200:
             try:
-                # Analyse de la réponse JSON
                 users = response.json()
                 if isinstance(users, list) and users:
                     print(f"{M}[+] {G}Users found")
@@ -921,8 +902,9 @@ def enumerate_users_via_wp_json(url):
                         user_id = user.get('id', 'Unknown')
                         slug = user.get('slug', 'Unknown')
                         print(f" - ID : {user_id}, Username : {R}{username}{G}, Slug : {R}{slug}")
+                    print("")    
                 else:
-                    print(f"{M}[-] {G}No users found")
+                    print(f"{M}[-] {G}No users found\n")
             except ValueError:
                 print(f"{M}[-] {R}Malformed json")
         elif response.status_code == 403:
@@ -938,9 +920,6 @@ def enumerate_users_via_wp_json(url):
 
 
 def display_results(result):
-    """
-    Affiche les résultats de détection WordPress de manière structurée.
-    """
     print(f"{M}[Meta Tag Version]{G} : {result['meta']}")
     print(f"{M}[Assets Version]{G}   : {result['assets']}")
     print(f"{M}[Readme Version]{G}   : {result['readme']}")
@@ -997,11 +976,6 @@ def detect_wordpress_version(url, cookies):
         print(f"[Error] {e}")
     print("")
 
-    
-
-
-
-
 
 def check_wordpress_paths(url, paths, cookies):
     global proxies
@@ -1024,11 +998,7 @@ def check_wordpress_paths(url, paths, cookies):
             if torusage == "yes":
                 proxies = tor_proxies
 
-                
-            # GET request
             response = requests.get(full_url, headers=headers, proxies=proxies, cookies=cookies, verify=False) # Disable SSL verification
-
-            # Get status code and response
             print(f"{M}[Info] {G}Checking : {Y}{full_url}")
             print(f"{M}[+] {G}Status Code : {Y}{response.status_code}{G}")
             
@@ -1058,15 +1028,14 @@ def check_wordpress_paths(url, paths, cookies):
 ###############################################################################################################
 
 def test_path_traversal(url, payload, cookies):
-    """Teste la vulnérabilité de path traversal en envoyant le payload à l'URL cible."""
     global seen_status_codes, proxies
     sensitive_keywords = [
-        "etc/passwd", "etc/hosts", "etc/shadow", "etc/sudoers", "etc/group",  # Fichiers Unix
-        "var/log", "var/tmp", "home", "root",  # Répertoires potentiellement sensibles sur Unix
-        "Windows/System32", "Windows/Win32", "Program Files",  # Répertoires sensibles Windows
-        "Users", "AppData", "Documents", "Downloads", "Desktop",  # Répertoires utilisateurs Windows
-        "boot.ini", "ntldr", "pagefile.sys",  # Fichiers systèmes Windows
-        "var/www", "tmp", "lib", "bin"  # Autres répertoires système potentiels
+        "etc/passwd", "etc/hosts", "etc/shadow", "etc/sudoers", "etc/group",  
+        "var/log", "var/tmp", "home", "root",  
+        "Windows/System32", "Windows/Win32", "Program Files",  
+        "Users", "AppData", "Documents", "Downloads", "Desktop",  
+        "boot.ini", "ntldr", "pagefile.sys",  
+        "var/www", "tmp", "lib", "bin" 
     ]    
     
     # Ensure the URL starts with 'http://' or 'https://'
@@ -1103,7 +1072,6 @@ def test_path_traversal(url, payload, cookies):
 
         
     try:
-        # Get the response for the control URL
         control_response = requests.get(control_url, proxies=proxies, allow_redirects=False, headers=headers, cookies=cookies)
         control_text = control_response.text
     except requests.exceptions.RequestException as e:
@@ -1111,13 +1079,12 @@ def test_path_traversal(url, payload, cookies):
         return
     
     try:
-        # Get the response for the target URL with the payload
         response = requests.get(target_url, proxies=proxies, allow_redirects=False, headers=headers, cookies=cookies)
         response_text = response.text
 
         # Check if the response code is 200 and if the response content contains sensitive data
         if response.status_code == 200:
-            # Check if the response contains a sensitive keyword (e.g., contents of etc/passwd)
+            # Check if the response contains a sensitive keyword (ex : contents of etc/passwd)
             if response_text != control_text:
                 if any(keyword in response_text for keyword in sensitive_keywords):
                     print(f"{G}[+] {Y}{keyword} {G}detected for : {C}{target_url}")
@@ -1150,7 +1117,6 @@ def test_path_traversal(url, payload, cookies):
 ###############################################################################################################
 
 
-
 def fetch_rdap_info(domain):
     url = f"https://rdap.verisign.com/com/v1/domain/{domain}"
     try:
@@ -1167,8 +1133,6 @@ def fetch_rdap_info(domain):
         print(f"{M}[Error] {R}{e}")
 
 def print_rdap_info(data):
-    
-    # Domain name
     print(f"{M}[Info] {G}Domain name : {Y}{data.get('ldhName', 'N/A')}")
     
     # Statuses
@@ -1178,7 +1142,7 @@ def print_rdap_info(data):
         for status in statuses:
             print(f"  - {status}")
     
-    # Entities (e.g., registrar)
+    # Entities 
     entities = data.get("entities", [])
     if entities:
         print(f"\n{M}[Info] {G}Associated Entities :")
@@ -1226,9 +1190,6 @@ def print_rdap_info(data):
 
 
 
-
-
-# Function to check HTTP headers
 def check_headers(headers):
     security_headers = ['Strict-Transport-Security', 'Content-Security-Policy', 'X-Content-Type-Options', 'X-XSS-Protection', 'X-Frame-Options']
     missing_headers = []
@@ -1237,17 +1198,18 @@ def check_headers(headers):
             missing_headers.append(header)
     return missing_headers
 
-# Function to check <meta> tags for redirections
+
 def check_meta_redirection(soup):
     metas = soup.find_all("meta", attrs={"http-equiv": "refresh"})
     return len(metas) > 0
 
-# Function to detect sources and sinks in the HTML
+
 def find_sources_and_sinks(soup):
     escaped_sinks = [re.escape(sink) for sink in SOURCES_SINKS]
     combined_sinks = "|".join(escaped_sinks)
     matches = re.findall(combined_sinks, str(soup))
     return list(set(matches))  # Remove duplicates
+
 
 # Function to check <script> tags and JavaScript for dangerous patterns
 def check_scripts(soup):
@@ -1262,7 +1224,7 @@ def check_scripts(soup):
 
     return matches
 
-# Function to check cookie security
+
 def check_cookie_security(headers):
     cookies = headers.get('Set-Cookie', '')
     issues = []
@@ -1272,7 +1234,7 @@ def check_cookie_security(headers):
         issues.append("Cookie not marked as HttpOnly")
     return issues
 
-# Function to check CSRF protection in forms
+
 def check_csrf_protection(soup):
     forms = soup.find_all("form")
     csrf_issues = []
@@ -1283,21 +1245,21 @@ def check_csrf_protection(soup):
             csrf_issues.append(f"Form {action} lacks CSRF protection")
     return csrf_issues
 
-# Function to check Content Security Policy (CSP)
+
 def check_csp(headers):
     csp = headers.get("Content-Security-Policy", "")
     if not csp:
         return ["No CSP defined"]
     return []
 
-# Function to check the server version from headers
+
 def check_server_version(headers):
     server = headers.get("Server", "")
     if server:
         return f"Server version: {server}"
     return "Server version not revealed"
 
-# Function to check for Clickjacking protection
+
 def check_clickjacking_protection(url):
     global proxies
     
@@ -1319,14 +1281,14 @@ def check_clickjacking_protection(url):
     except requests.RequestException as e:
         return f"{M}[Error] {R}Error during the check: {e}"
 
-# Function to check for open redirects
+
 def check_open_redirect(headers, url):
     location = headers.get('Location', None)
     if location and not location.startswith(url):
         return f"Open Redirect detected to {location}."
     return "No open redirects detected."
 
-# Main function to analyze HTTP response
+
 def analyze_response(resp, final_url):
     try:
         soup = BeautifulSoup(resp.text, 'html.parser')
@@ -1397,6 +1359,7 @@ def analyze_response(resp, final_url):
         print(f"{M}[ERROR] {R}Error during analysis : {e}")
         return {"error": str(e)}
 
+
 # Function to audit a page by its URL
 def audit_page(url, cookies):
     global proxies
@@ -1447,7 +1410,6 @@ def audit_page(url, cookies):
 
 
 def inject_open_redirect(url, payloads):
-    
     parsed_url = urlparse(url)
     original_params = parse_qsl(parsed_url.query)
     injected_urls = []
@@ -1503,7 +1465,6 @@ def test_injected_urls(urls, cookies=None):
 
             response = requests.get(url, headers=headers, proxies=proxies, cookies=cookies, timeout=10, allow_redirects=True)
 
-            # Vérifier si l'URL finale sort du domaine d'origine
             parsed_original = urlparse(url)
             parsed_final = urlparse(response.url)
 
@@ -1530,11 +1491,6 @@ def test_injected_urls(urls, cookies=None):
 
 # Fonction de scan CRLF
 def crlfScan(url, payloads, cookies, outputlist):
-    """
-    Fonction principale pour effectuer un scan de vulnérabilités CRLF sur une URL donnée
-    avec des payloads spécifiques.
-    """
-    
     for payload in payloads:
         for links in outputlist:
             if verbosity == "yes":
@@ -1554,10 +1510,6 @@ def crlfScan(url, payloads, cookies, outputlist):
 
 def request(url, payload='', headers=None, cookies=None):
     global proxies
-    
-    """
-    Fonction pour envoyer une requête HTTP avec un payload CRLF et analyser la réponse.
-    """
     try:
         
         headers = headers or {}
@@ -1569,9 +1521,7 @@ def request(url, payload='', headers=None, cookies=None):
         if torusage == "yes":
             proxies = tor_proxies
 
-
         response = requests.get(url, headers=headers, proxies=proxies, cookies=cookies, timeout=5)
-        # Analyse de la réponse HTTP
         return basicChecks(response, url)
     except requests.exceptions.Timeout:
         print(f"{M}[Error] {R}Timeout: {url}")
@@ -1584,10 +1534,6 @@ def request(url, payload='', headers=None, cookies=None):
         return True
 
 def basicChecks(response, url):
-    """
-    Effectue les vérifications de base sur la réponse HTTP pour identifier les vulnérabilités CRLF.
-    """
-    # Liste d'URL qui indiquent une redirection
     googles = ["https://www.google.com", "http://www.google.com", "google.com", "www.google.com"]
 
     if response.status_code in REDIRECT_CODES:
@@ -1646,6 +1592,7 @@ def main():
     parser.add_argument("--dalfox", action="store_true", help="Use dalfox")
     parser.add_argument("--sqlmap", action="store_true", help="Use sqlmap")
     parser.add_argument("--nuclei", action="store_true", help="Use nuclei")
+    parser.add_argument("--wpscan", action="store_true", help="Use wpscan (need sudo rights)")
                         
     args = parser.parse_args()
 
@@ -1737,8 +1684,52 @@ def main():
             print(f"{M}[Info] {R}Invalid choice. nuclei parametters set to default")
             setup_parameters_nuclei = ""
 
+
+    if args.wpscan:
+        
+        
+        if os.name == "posix" and os.geteuid() != 0:
+            print(f"{M}[Info] {R}This program must be run as root ton launch wpscan")
+            rootornot = "no"
+        else:
+            rootornot = "yes"
+            confirm2 = input(f"\n{M}[Info] {G}Do you want to use token file and add the command  --api-token content_of_the_token_file (y/n/h) : {Y}").strip()
+            if confirm2.lower() in ['y', 'yes']:
+                token_file_path = "install_paths\wpscan_token.txt" 
+                with open(token_file_path, "r") as token_file:
+                    token = token_file.read().strip()
+                if token:
+                    setup_token_wpscan = f"--api-token {token}"
+                    print(f"{M}[Info] {G}Token ({token}) loaded successfully and added to the command")
+                else:
+                    print(f"{M}[Info] {R}Token file is empty. wpscan parameters set to default")
+                    setup_token_wpscan = ""            
+            elif confirm2.lower() in ['n', 'no']:
+                setup_token_wpscan = ""
+            elif confirm2.lower() in ['h', 'help']:
+                clear_screen()
+                print(banner)
+                help_annex()
+            else:
+                print(f"{M}[Info] {R}Invalid choice. wpscan parametters set to default")
+                setup_token_wpscan = ""
+            
+            confirm = input(f"\n{M}[Info] {G}Do you want to add parameters for wpscan (y/n/h) : {Y}").strip()
+            if confirm.lower() in ['y', 'yes']:
+                setup_parameters_wpscan = input(f"{M}[Info] {G}Add parameters for wpscan (ex : -e vp) or use nothing for default scanning :\n{Y}")
+            elif confirm.lower() in ['n', 'no']:
+                setup_parameters_wpscan = setup_token_wpscan
+            elif confirm.lower() in ['h', 'help']:
+                clear_screen()
+                print(banner)
+                help_annex()
+            else:
+                print(f"{M}[Info] {R}Invalid choice. wpscan parametters set to default")
+                setup_parameters_wpscan = setup_token_wpscan
+
     if args.tor:
         check_tor_connection()
+    
     
     if args.proxie:
         proxie_setup(args.proxie)
@@ -1821,10 +1812,7 @@ def main():
 
         # Find sensitive parameters in links
         print(f"{M}[Info] {G}Identifying links with sensitive parameters...")
-        
-        
         interesting_links = find_urls_with_params_and_php(all_links)
-
         interesting_links_with_params = [entry for entry in interesting_links if entry['params']]  # Assurez-vous que 'params' existe
 
 
@@ -1833,7 +1821,6 @@ def main():
         printed_urls = set()  # Track URLs that have been printed
         display_count = 0
 
-        # Compter les liens avec des paramètres
         print(f"{M}[Info] {G}Found {Y}{len(interesting_links_with_params)} {G}Interesting links")
 
     if args.exclude:
@@ -1894,7 +1881,6 @@ def main():
         parsed_url = urlparse(args.url)
         domain = parsed_url.netloc
 
-        # Utiliser tldextract pour extraire les parties du domaine
         extracted = tldextract.extract(domain)
         base_domain = f"{extracted.domain}.{extracted.suffix}"
 
@@ -1954,7 +1940,6 @@ def main():
         parsed_url = urlparse(args.url)
         domain = parsed_url.netloc
 
-        # Utiliser tldextract pour extraire les parties du domaine
         extracted = tldextract.extract(domain)
         base_domain = f"{extracted.domain}.{extracted.suffix}"
         subreponse(base_domain)
@@ -1991,15 +1976,12 @@ def main():
                 base_url, _, _ = url.partition("=")
                 target_url = base_url + "="
 
-            # Lancer le scan seulement si des payloads ont été chargés avec succès
             crlfScan(url, payloads, cookies, outputlist)
 
     if args.infos:
         
         parsed_url = urlparse(args.url)
         domain = parsed_url.netloc
-
-        # Utiliser tldextract pour extraire les parties du domaine
         extracted = tldextract.extract(domain)
         base_domain = f"{extracted.domain}.{extracted.suffix}"        
         audit_page(args.url, cookies)
@@ -2014,30 +1996,26 @@ def main():
         else:    
             # Définir des valeurs par défaut sûres
             output_data = outputlist
-            output_data = output_data if output_data is not None else []  # Garantir une liste par défaut
+            output_data = output_data if output_data is not None else []  
 
             #output_robots = extract_robots if args.robots else set()
-            #output_robots = output_robots if output_robots is not None else set()  # Garantir un ensemble par défaut
+            #output_robots = output_robots if output_robots is not None else set()  
 
             # Combiner les données
-            output_data_combined = list(output_data) #+ list(output_robots)
+            output_data_combined = list(output_data) # + list(output_robots)
             
-            # Sauvegarder dans le fichier avec UTF-8
             with open(args.output, 'w', encoding='utf-8') as f:
                 f.write("\n".join(output_data_combined))
             print(f"{M}[Info] {G}Results saved to {Y}{args.output}")
 
 
 
-
-        
     if args.sqlmap:
         
         filepath = loadit("install_paths/sqlmap.txt")
 
-        # S'assurer que filepath est une chaîne, même s'il vient sous forme de liste
         if isinstance(filepath, list):
-            filepath = filepath[0]  # Prenez le premier élément de la liste                
+            filepath = filepath[0]  # takes first element                
 
 
         if filepath is None:
@@ -2052,14 +2030,14 @@ def main():
                     default_sqlmap_command = [sqlmap_path_expanded, links, "--batch"]
 
                     if setup_parameters_sqlmap.strip():
-                        sqlmap_args = shlex.split(setup_parameters_sqlmap)  # Convertir la chaîne en liste
+                        sqlmap_args = shlex.split(setup_parameters_sqlmap)  
                         command = default_sqlmap_command + sqlmap_args
                     else:
-                        command = default_sqlmap_command  # Utiliser la commande par défaut
+                        command = default_sqlmap_command  
 
                     print(f"{M}[Info] {G}Launching the following command :{Y}")
                     print(command)
-                    print(f"{M}[Info] {G}Current target :{C}{links}")
+                    print(f"{M}[Info] {G}Current target : {C}{links}")
                     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
                     # Capture and print output in real-time
@@ -2078,9 +2056,8 @@ def main():
         
         filepath = loadit("install_paths/dalfox.txt")
 
-        # S'assurer que filepath est une chaîne, même s'il vient sous forme de liste
         if isinstance(filepath, list):
-            filepath = filepath[0]  # Prenez le premier élément de la liste                
+            filepath = filepath[0]  # takes first element                
 
 
         if filepath is None:
@@ -2095,14 +2072,14 @@ def main():
                     default_dalfox_command = [dalfox_path_expanded, "url", links]
 
                     if setup_parameters_dalfox.strip():
-                        dalfox_args = shlex.split(setup_parameters_dalfox)  # Convertir la chaîne en liste
+                        dalfox_args = shlex.split(setup_parameters_dalfox)  
                         command = default_dalfox_command + dalfox_args
                     else:
-                        command = default_dalfox_command  # Utiliser la commande par défaut
+                        command = default_dalfox_command  
 
                     print(f"{M}[Info] {G}Launching the following command :{Y}")
                     print(command)
-                    print(f"{M}[Info] {G}Current target :{C}{links}")
+                    print(f"{M}[Info] {G}Current target : {C}{links}")
                     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
                     # Capture and print output in real-time
@@ -2121,9 +2098,8 @@ def main():
         
         filepath = loadit("install_paths/nuclei.txt")
 
-        # S'assurer que filepath est une chaîne, même s'il vient sous forme de liste
         if isinstance(filepath, list):
-            filepath = filepath[0]  # Prenez le premier élément de la liste                
+            filepath = filepath[0]  # takes first element                
 
 
         if filepath is None:
@@ -2138,14 +2114,14 @@ def main():
                     default_nuclei_command = [nuclei_path_expanded, "-u", links]
 
                     if setup_parameters_nuclei.strip():
-                        nuclei_args = shlex.split(setup_parameters_nuclei)  # Convertir la chaîne en liste
+                        nuclei_args = shlex.split(setup_parameters_nuclei)  
                         command = default_nuclei_command + nuclei_args
                     else:
-                        command = default_nuclei_command  # Utiliser la commande par défaut
+                        command = default_nuclei_command 
 
                     print(f"{M}[Info] {G}Launching the following command :{Y}")
                     print(command)
-                    print(f"{M}[Info] {G}Current target :{C}{links}")
+                    print(f"{M}[Info] {G}Current target : {C}{links}")
                     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
                     # Capture and print output in real-time
@@ -2161,6 +2137,45 @@ def main():
 
 
 
+    if args.wpscan:
+        if rootornot == "yes":
+            filepath = loadit("install_paths/wpscan.txt")
+
+            if isinstance(filepath, list):
+                filepath = filepath[0]  # takes first element                
+
+
+            if filepath is None:
+                print(f"{M}[Info] {G}no wpscan path provided in install_paths/wpscan.txt")
+                sys.exit()
+            else:
+                wpscan_check = check_installation_path(filepath)
+                if wpscan_check == "yes":
+                    
+                    wpscan_path_expanded = os.path.expanduser(filepath)
+                    default_wpscan_command = [wpscan_path_expanded, "--url", args.url] # one url to scan
+
+                    if setup_parameters_wpscan.strip():
+                        wpscan_args = shlex.split(setup_parameters_wpscan)
+                        command = default_wpscan_command + wpscan_args
+                    else:
+                        command = default_wpscan_command
+
+                    print(f"{M}[Info] {G}Launching the following command :{Y}")
+                    print(command)
+                    print(f"{M}[Info] {G}Current target : {C}{args.url}")
+                    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+                    # Capture and print output in real-time
+                    for line in iter(process.stdout.readline, ''):
+                        print(f"{G}{line.strip()}")
+                    
+                    for line in iter(process.stderr.readline, ''):
+                        print(f"{R}{line.strip()}")
+                    
+                    process.stdout.close()
+                    process.stderr.close()
+                    process.wait()  # Wait for the process to finish  
 
 
     print(f"\n\n{M}[Info] {Y}End of search")
