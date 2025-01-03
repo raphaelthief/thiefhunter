@@ -927,7 +927,9 @@ def display_results(result):
     print(f"\n{M}[Info] {G}Plugins and Themes Detected")
     for item in result['plugins_and_themes']:
         print(f"{item}")
-
+    print(f"\n{M}[Info] {G} Wordpress versions vulns : https://wpscan.com/wordpresses/")
+    print(f"{M}[Info] {G} Wordpress plugins vulns : https://wpscan.com/plugins/")
+    print(f"{M}[Info] {G} Wordpress thmes vulns : https://wpscan.com/themes/")
 
 def detect_wordpress_version(url, cookies):
     global proxies
@@ -965,7 +967,6 @@ def detect_wordpress_version(url, cookies):
             "plugins_and_themes": detect_plugins_and_themes(soup)
         }
 
-        # Afficher les résultats
         display_results(result)
         print()
         enumerate_users_via_wp_json(url)
