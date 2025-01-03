@@ -901,7 +901,7 @@ def enumerate_users_via_wp_json(url):
                         username = user.get('name', 'Unknown')
                         user_id = user.get('id', 'Unknown')
                         slug = user.get('slug', 'Unknown')
-                        print(f" - ID : {user_id}, Username : {R}{username}{G}, Slug : {R}{slug}")
+                        print(f" - ID : {user_id}, Username : {R}{username}{G}, Slug : {R}{slug}{G}")
                     print("")    
                 else:
                     print(f"{M}[-] {G}No users found\n")
