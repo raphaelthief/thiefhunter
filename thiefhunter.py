@@ -2153,7 +2153,7 @@ def main():
                 if wpscan_check == "yes":
                     
                     wpscan_path_expanded = os.path.expanduser(filepath)
-                    default_wpscan_command = [wpscan_path_expanded, "--url", args.url] # one url to scan
+                    default_wpscan_command = [wpscan_path_expanded, "--url", args.url, "--no-update", "--no-banner"] # one url to scan
 
                     if setup_parameters_wpscan.strip():
                         wpscan_args = shlex.split(setup_parameters_wpscan)
