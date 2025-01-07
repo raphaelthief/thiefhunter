@@ -1687,8 +1687,6 @@ def main():
 
 
     if args.wpscan:
-        
-        
         if os.name == "posix" and os.geteuid() != 0:
             print(f"{M}[Info] {R}This program must be run as root ton launch wpscan")
             rootornot = "no"
@@ -1696,10 +1694,11 @@ def main():
             rootornot = "yes"
             confirm2 = input(f"\n{M}[Info] {G}Do you want to use token file and add the command  --api-token content_of_the_token_file (y/n/h) : {Y}").strip()
             if confirm2.lower() in ['y', 'yes']:
-                token_file_path = "install_paths\wpscan_token.txt" 
-                with open(token_file_path, "r") as token_file:
-                    token = token_file.read().strip()
-                if token:
+                token_file_path = os.path.join("install_paths", "wpscan_token.txt") 
+                with open(token_file_path, 'r', encoding='utf-8') as token_file:
+                    token_lines = [line.strip() for line in token_file.readlines() if line.strip()]
+                if token_lines:
+                    token = token_lines[0]
                     setup_token_wpscan = f"--api-token {token}"
                     print(f"{M}[Info] {G}Token ({token}) loaded successfully and added to the command")
                 else:
