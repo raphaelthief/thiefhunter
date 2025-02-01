@@ -1,4 +1,4 @@
-import argparse, requests, time, re, warnings, tldextract, urllib3, os, difflib, logging, random, threading, signal, sys, subprocess, shlex, pprint
+import argparse, requests, time, re, warnings, tldextract, urllib3, os, difflib, logging, random, threading, signal, sys, subprocess, shlex, pprint, http.client
 import concurrent.futures
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin, parse_qs, parse_qsl, urlencode, urlunparse
@@ -896,12 +896,16 @@ def enumerate_users_via_wp_json(url):
             try:
                 users = response.json()
                 if isinstance(users, list) and users:
-                    print(f"{M}[+] {G}Users found")
+                    print(f"{M}[+] {G}Users found\n")
+                    print(f"{Y}-------------------------{G}")
                     for user in users:
                         username = user.get('name', 'Unknown')
                         user_id = user.get('id', 'Unknown')
                         slug = user.get('slug', 'Unknown')
-                        print(f" - ID : {user_id}, Username : {R}{username}{G}, Slug : {R}{slug}{G}")
+                        print(f" - ID       : {R}{user_id}{G}")
+                        print(f" - Username : {R}{username}{G}")
+                        print(f" - Slug     : {R}{slug}{G}")
+                        print(f"{Y}-------------------------{G}")
                     print("")    
                 else:
                     print(f"{M}[-] {G}No users found\n")
@@ -1987,6 +1991,17 @@ def main():
         audit_page(args.url, cookies)
         fetch_rdap_info(base_domain)
         
+        # TRACE request ...
+        host = parsed_url.hostname
+        path = parsed_url.path if parsed_url.path else "/"
+        conn = http.client.HTTPConnection(host)
+        conn.request("TRACE", path)
+        response = conn.getresponse()
+        print(f"\n{M}[Info] {G}TRACE request :")
+        print(f"{M}[+] {G}Statut  : {Y}", response.status)
+        print(f"{M}[+] {G}Headers ...\n", response.headers)
+        conn.close()
+
         
     # Save results to a file if requested
     if args.output:
@@ -2154,7 +2169,7 @@ def main():
                     
                     wpscan_path_expanded = os.path.expanduser(filepath)
                     default_wpscan_command = [wpscan_path_expanded, "--url", args.url, "--no-update", "--no-banner"] # one url to scan
-
+                     
                     if setup_parameters_wpscan.strip():
                         wpscan_args = shlex.split(setup_parameters_wpscan)
                         command = default_wpscan_command + wpscan_args
