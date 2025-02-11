@@ -448,7 +448,39 @@ def proxie_setup(proxie):
 ###############################################################################################################
 ############################################## Scan urls / domains ############################################
 ###############################################################################################################
+def fetch_pagelinks(url, cookies):
+    global proxies, display_count 
+    
+    try:
+        if user_agents == "yes":
+            headersX = loadit("payloads/user_agents.txt")
+            headers = {
+                "User-Agent": random.choice(headersX)
+            }        
+        else:
+            headers = None
 
+        cookies = cookies or {}        
+        
+        if torusage == "yes":
+            proxies = tor_proxies
+
+        api_url = f"https://api.hackertarget.com/pagelinks/?q={url}"
+
+        response = requests.get(api_url, headers=headers, cookies=cookies, timeout=10)  # Timeout de 10 secondes
+        response.encoding = 'utf-8' 
+        lines = response.text.strip().split("\n")
+        line_count = len(lines)
+        
+        for line in lines:
+            print(f"{M}[api_crawl] {G}{line}")
+
+        return line_count
+        
+        
+    except requests.exceptions.RequestException as e:
+        print(f"{M}[Error] {R}Could not fetch https://api.hackertarget.com/pagelinks/?q={url}: {e}")
+        
 
 def fetch_page(url, cookies):
     global proxies
@@ -1799,8 +1831,10 @@ def main():
             crawl(link, current_depth + 1, cookies)
 
     if args.extract:
-        print(f"{M}[Info] {G}Crawling {args.url} ...")
+        print(f"{M}[Info] {G}Crawling {Y}{args.url} {G}...")
         crawl(args.url, 0, cookies)
+        
+
 
     # Include Wayback URLs if requested
     if args.wayback:
@@ -1875,7 +1909,12 @@ def main():
                         print(f"{M}[No parameters] - {G}{entry['url']}")
                         display_count += 1
                         outputlist.add(entry['url'])
-                         
+
+        if args.show_all:
+            print(f"\n{M}[Info] {G}Displaying crawl from {Y}https://api.hackertarget.com/pagelinks/?q={args.url}\n")
+            count = fetch_pagelinks(args.url, cookies)
+            display_count += count
+            
         print(f"\n{M}[Info] {G}Displayed {Y}{display_count} {G}links")
         if not args.robots:
             print(f"{M}[Info] {Y}End of extract\n")
