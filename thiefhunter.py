@@ -154,10 +154,10 @@ def check_ips(lanch):
             print(f"{M}[Error] {R}: {stderr}")
             error_spoted = "yes"
         else:
-            #print(f"{M}[Info] {G}Outgoing ip (--sqlmap, --dalfox and --nuclei): {stdout.strip()}")
+            #print(f"{M}[Info] {G}Outgoing ip (--sqlmap, --dalfox, --wpscan and --nuclei): {stdout.strip()}")
             
             outgoing_ip = stdout.strip()
-            print(f"{M}[Info] {G}Outgoing ip (--sqlmap, --dalfox and --nuclei): {outgoing_ip}")
+            print(f"{M}[Info] {G}Outgoing ip (--sqlmap, --dalfox, --wpscan and --nuclei): {outgoing_ip}")
 
 
         # Verify the outgoing IP with an HTTP request
