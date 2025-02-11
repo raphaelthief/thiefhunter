@@ -95,12 +95,12 @@ python thiefhunter.py -u https://example.com --ip-check
 
 - Exemple 2 : Usage of the internal Tor proxy within ThiefHunter but no usage for external programs triggered by thiefHunter
 
-![ex2](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/checkip1.JPG "ex2")
+![ex2](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/checkip2.JPG "ex2")
 
 
 - Exemple 3 : Use of Tor via an external program (ex : Torsocks) with Tor's exit IP applied to external programs triggered by thiefHunter
 
-![ex3](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/checkip1.JPG "ex3")
+![ex3](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/checkip3.JPG "ex3")
 
 
 
