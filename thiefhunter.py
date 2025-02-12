@@ -444,6 +444,348 @@ def proxie_setup(proxie):
     }    
     
 
+###############################################################################################################
+############################################ Extract sensitive infos ##########################################
+###############################################################################################################
+def extract_emails(html):
+    """Extracts email addresses from an HTML page"""
+    return set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', html))
+
+
+def extract_french_phone_numbers(html):
+    """Extracts all valid French phone numbers from an HTML page"""
+    pattern = re.compile(r"""
+        (?:\+33|0033)               # Country code for France (prefixes +33 or 0033)
+        [\s.-]?                     
+        (?:0?[1-9])                 
+        (?:[\s.-]?\d{2}){4}         
+        |
+        0[1-9]                      
+        (?:[\s.-]?\d{2}){4}         
+        |
+        \d{10}                      
+    """, re.VERBOSE)
+
+    found_numbers = re.findall(pattern, html)
+    valid_numbers = [num for num in found_numbers if not re.match(r"^\d{8,}$", num)]
+    valid_numbers = [num for num in valid_numbers if not re.search(r'[-.].*[-.]', num)]
+    return set(valid_numbers)
+
+
+def extract_sensitive_urls(html):
+    """Extracts sensitive files and paths"""
+    sensitive_patterns = [
+        r'(?:/|\\|\b)(\.env)',
+        r'(?:/|\\|\b)(config\.php)',
+        r'(?:/|\\|\b)(wp-config\.php)',
+        r'(?:/|\\|\b)(database\.yml)',
+        r'(?:/|\\|\b)(settings\.py)',
+        r'(?:/|\\|\b)(\.git)',
+        r'(?:/|\\|\b)(\.htaccess)',
+        r'(?:/|\\|\b)(phpinfo\.php)',
+        r'(?:/|\\|\b)(dump\.sql)',
+        r'(?:/|\\|\b)(backup)',
+        r'(?:/|\\|\b)(admin)',
+        r'(?:/|\\|\b)(\.bash_history)',  
+        r'(?:/|\\|\b)(\.ssh/)',  
+        r'(?:/|\\|\b)(id_rsa)',  
+        r'(?:/|\\|\b)(id_rsa\.pub)',  
+        r'(?:/|\\|\b)(authorized_keys)',  
+        r'(?:/|\\|\b)(known_hosts)',  
+        r'(?:/|\\|\b)(passwd)',  
+        r'(?:/|\\|\b)(shadow)',  
+        r'(?:/|\\|\b)(credentials)',  
+        r'(?:/|\\|\b)(secrets\.json)',  
+        r'(?:/|\\|\b)(apikeys\.txt)',  
+        r'(?:/|\\|\b)(config\.ini)',  
+        r'(?:/|\\|\b)(web\.config)',  
+        r'(?:/|\\|\b)(docker-compose\.yml)',  
+        r'(?:/|\\|\b)(\.dockercfg)',  
+        r'(?:/|\\|\b)(.npmrc)',  
+        r'(?:/|\\|\b)(.composer/auth.json)',  
+        r'(?:/|\\|\b)(server\.key)',  
+        r'(?:/|\\|\b)(server\.crt)',  
+        r'(?:/|\\|\b)(private\.key)',  
+        r'(?:/|\\|\b)(ssl-cert\.pem)',  
+        r'(?:/|\\|\b)(.aws/)',  
+        r'(?:/|\\|\b)(.azure/)',  
+        r'(?:/|\\|\b)(.gcloud/)',  
+        r'(?:/|\\|\b)(terraform\.tfstate)',  
+        r'(?:/|\\|\b)(kubeconfig)',  
+        r'(?:/|\\|\b)(.htpasswd)',  
+        r'(?:/|\\|\b)(logs/)',  
+        r'(?:/|\\|\b)(debug\.log)',  
+        r'(?:/|\\|\b)(error\.log)',  
+        r'(?:/|\\|\b)(access\.log)',  
+        r'(?:/|\\|\b)(node_modules/)',  
+        r'(?:/|\\|\b)(vendor/)', 
+    ]
+
+    matches = set()
+    for pattern in sensitive_patterns:
+        found = re.findall(pattern, html, re.IGNORECASE)
+        for path in found:
+            if not path.startswith(("http", "https")):
+                full_url = path
+                matches.add(full_url)
+    return matches
+
+
+def extract_source_code_urls(html):
+    """Detect links to source code repositories (GitHub, GitLab, Bitbucket, etc.)."""
+    source_patterns = [
+        r'https?://github\.com/[A-Za-z0-9_-]+/[A-Za-z0-9._-]+',
+        r'https?://github\.io/[A-Za-z0-9_-]+/[A-Za-z0-9._-]+',
+        r'https?://gitlab\.com/[A-Za-z0-9_-]+/[A-Za-z0-9._-]+',
+        r'https?://bitbucket\.org/[A-Za-z0-9_-]+/[A-Za-z0-9._-]+',
+        r'https?://gist\.github\.com/[A-Za-z0-9_-]+/[A-Za-z0-9]+',
+        r'https?://pastebin\.com/[A-Za-z0-9]+',
+        r'https?://sourceforge\.net/projects/[A-Za-z0-9_-]+',
+        
+        # APIs GraphQL
+        r'https?://.*\.graphql\.com.*',
+        r'https?://.*\.graphql\.org.*',
+        r'https?://.*\.hasura\.io.*',
+        r'https?://.*\.apollo\.graph.*',
+        r'https?://.*\.graphqlhub\.berkeley.edu.*',
+        r'https?://.*\.prisma\.io.*',
+        r'https?://.*\.shopify\.com.*graphql.*',
+        r'https?://.*\.api.*graphql.*',
+        r'https?://.*\.dev/api.*graphql.*',
+        r'https?://.*\.com/api.*graphql.*',
+
+        # Generic API calls (ex: fetch, axios, XMLHttpRequest, curl, etc.)
+        r'https?://[a-zA-Z0-9.-]+/api/[a-zA-Z0-9/_-]+',
+        r'https?://[a-zA-Z0-9.-]+/graphql',
+        r'https?://[a-zA-Z0-9.-]+/v[0-9]+/.*',  # Versioning API ex: /v1/, /v2/
+        
+        # API calls in AJAX, Fetch, or other XHR requests
+        r'fetch\(["\'](https?://[a-zA-Z0-9.-]+/.*?)[\?"\']',
+        r'axios\.(get|post|put|delete|patch)\(["\'](https?://[a-zA-Z0-9.-]+/.*?)[\?"\']',
+        r'XMLHttpRequest\(\)\.open\(["\'](GET|POST|PUT|DELETE|PATCH)["\'],\s*["\'](https?://[a-zA-Z0-9.-]+/.*?)[\?"\']',
+        r'\$.ajax\({\s*url:\s*["\'](https?://[a-zA-Z0-9.-]+/.*?)[\?"\']',
+
+        # API specific to well-known platforms
+        r'https?://api\.github\.com/.*',  
+        r'https?://gitlab\.com/api/.*',  
+        r'https?://bitbucket\.org/api/.*',
+        r'https?://api\.slack\.com/.*',
+        r'https?://api\.discord\.com/.*',
+        r'https?://api\.stripe\.com/.*',
+        r'https?://api\.paypal\.com/.*',
+        r'https?://graph\.facebook\.com/.*',
+        r'https?://graph\.instagram\.com/.*',
+        r'https?://api\.twitter\.com/.*',
+        r'https?://api\.twitch\.tv/.*',
+        r'https?://api\.youtube\.com/.*',
+        r'https?://api\.openweathermap\.org/.*',
+        r'https?://api\.dropbox\.com/.*',
+        r'https?://api\.shopify\.com/.*',
+        r'https?://api\.googleapis\.com/.*',
+        r'https?://maps\.googleapis\.com/.*',
+        r'https?://api\.microsoft\.com/.*',
+        r'https?://graph\.microsoft\.com/.*',
+        r'https?://api\.telegram\.org/.*',
+        r'https?://api\.notion\.com/.*',
+        r'https?://api\.airtable\.com/.*',
+
+        # Generic GraphQL entry points
+        r'https?://.*?/graphql',
+        r'https?://.*?/api/graphql',
+        r'https?://.*?/v[0-9]+/graphql',
+
+        # Internal API entry points (if they follow a certain pattern)
+        r'https?://[a-zA-Z0-9.-]+/internal_api/.*',
+        r'https?://[a-zA-Z0-9.-]+/private_api/.*',
+        r'https?://[a-zA-Z0-9.-]+/admin_api/.*',
+    ]
+
+    matches = set()
+    for pattern in source_patterns:
+        matches.update(re.findall(pattern, html, re.IGNORECASE))
+    
+    return matches
+
+
+def extract_sensitive_data(html):
+    """Detects API keys, tokens, credentials, and other sensitive information"""
+    sensitive_patterns = {
+        # AWS Keys: Should be surrounded by spaces or quotes
+        "AWS Access Key": r'(?i)(?:"|\b|=)(AKIA[0-9A-Z]{16})(?=\b|")',
+        
+        # Google API Key: A valid key starts with 'AIza' and follows a specific structure
+        "Google API Key": r'(?i)(?:"|\b|=)(AIza[0-9A-Za-z-_]{35})(?=\b|")',
+        
+        # GitHub Token: Prefixed with 'ghp_' and 36 characters long
+        "GitHub Token": r'(?i)(?:"|\b|=)(ghp_[0-9a-zA-Z]{36})(?=\b|")',
+        "GitHub Token": r'(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36}',
+        
+        # Gitlab Token
+        "Gitlab Token": r'(glpat|gldt|glft|glsoat|glrt)-',
+        "Gitlab Token": r'[A-Za-z0-9_\-]{20,50}(?!\w)',
+        "Gitlab Token": r'GR1348941[A-Za-z0-9_\-]{20,50}(?!\w))',
+        "Gitlab Token": r'glcbt-([0-9a-fA-F]{2}_)?[A-Za-z0-9_\-]{20,50}(?!\w)', # CI/CD Token - `glcbt` or `glcbt-XY_` where XY is a 2-char hex 'partition_id'
+        "Gitlab Token": r'glimt-[A-Za-z0-9_\-]{25}(?!\w)',  # Incoming Mail Token - generated by SecureRandom.hex, default length 16 bytes
+        "Gitlab Token": r'glptt-[A-Za-z0-9_\-]{40}(?!\w)', # Trigger Token - generated by `SecureRandom.hex(20)`
+        "Gitlab Token": r'glagent-[A-Za-z0-9_\-]{50,1024}(?!\w)', # Agent Token - generated by `Devise.friendly_token(50)`
+        "Gitlab Token": r'gloas-[A-Za-z0-9_\-]{64}(?!\w)', # GitLab OAuth Application Secret - generated by `SecureRandom.hex(32)`
+        
+        # Discord Token
+        "Gitlab Token": r'[MNO][a-zA-Z\d_-]{23,25}\.[a-zA-Z\d_-]{6}\.[a-zA-Z\d_-]{27}',
+        
+        # Slack Token : Type "xoxb-", "xoxp-", "xoxa-", "xoxr-"
+        "Slack Token": r'(?i)(?:"|\b|=)(xox[baprs]-[0-9A-Za-z]{10,48})(?=\b|")',
+        
+        # Discord Token : JWT format
+        "Discord Token": r'(?i)(?:"|\b|=)([MN][A-Za-z\d]{23}\.[\w-]{6}\.[\w-]{27})(?=\b|")',
+        
+        # Stripe API Key : Commence par 'sk_live_' followed by 24 characters
+        "Stripe API Key": r'(?i)(?:"|\b|=)(sk_live_[0-9a-zA-Z]{24})(?=\b|")',
+        
+        # JWT Tokens : 3 segments separated by dots, must be surrounded by a clear context
+        "JWT Token": r'(?i)(?:"|\b|=)(eyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2}\.[A-Za-z0-9_-]+)(?=\b|")',
+        
+        # Private Key : Must appear with a well-defined tag
+        "Private Key": r'(?i)(-----BEGIN (?:RSA|DSA|EC|PGP|OPENSSH) PRIVATE KEY-----[\s\S]+?-----END (?:RSA|DSA|EC|PGP|OPENSSH) PRIVATE KEY-----)',
+        
+        # Password in URL : Must be preceded by "password=" to be valid
+        "Password in URL": r'(?i)(?:"|\b|=)(password=[^&\s]+)(?=\b|")',
+        
+        # Detection of CSRF tokens in a <meta> tag
+        "CSRF Token": r'(?i)<meta\s+name=["\']csrf-token["\']\s+content=["\']([a-zA-Z0-9\-_]+)["\']\s*/?>',
+        
+        # Generic detection of sensitive keywords (e.g., api_key="...", token="...", secret="...")
+        "Generic Sensitive Keyword": r'(?i)(?:"|\b|=)(?:api[_-]?key|secret|token|auth[_-]?key|access[_-]?key|bearer)["\']?\s*[:=]\s*["\']?([a-zA-Z0-9\-_]{16,64})(?=\b|")'
+    }
+    
+    found_data = {}
+    for label, pattern in sensitive_patterns.items():
+        try:
+            # Use re.DOTALL to handle multiline patterns and re.IGNORECASE for case-insensitivity
+            matches = re.findall(pattern, html, re.IGNORECASE | re.DOTALL)
+            if matches:
+                found_data[label] = matches
+        except re.error as e:
+            print(f"[!] Error with pattern for {label} : {e}")
+    return found_data
+
+
+def extract_sensitive_comments(html):
+    """Extract HTML comments containing sensitive keywords along with their respective lines"""
+    lines = html.split("\n")
+    sensitive_comments = []
+
+    keywords = [
+        # EN
+        'password', 'passwd', 'pwd', 'secret', 'token', 'api_key', 'apikey', 
+        'auth', 'authorization', 'bearer', 'jwt', 'access_token', 'refresh_token',
+        'sessionid', 'session_id', 'client_secret', 'client_id', 'private_key',
+        'public_key', 'ssh_key', 'oauth', 'oauth_token', 'aws_access_key',
+        'aws_secret_key', 'google_api_key', 'firebase_api_key', 'stripe_api_key',
+        'github_token', 'gitlab_token', 'slack_token', 'discord_token', 
+        'webhook', 'credentials', 'database_url', 'db_password', 'db_user',
+        'smtp_password', 'smtp_user', 'ftp_password', 'ftp_user', 'proxy_password',
+        'proxy_user', 'encryption_key', 'crypt_key', 'master_key', 
+        'root_password', 'admin_password', 'superuser', 'keystore', 'hmac_key',
+        
+        # FR
+        'motdepasse', 'mdp', 'clé_secrète', 'clé_api', 'clé_privée', 
+        'clé_publique', 'authentification', 'autorisation', 'jeton', 
+        'clé_cryptage', 'clé_chiffrement', 'secret_partagé', 'secret_key',
+        'mot_de_passe_admin', 'mot_de_passe_root', 'base_de_données',
+        'utilisateur_bd', 'mot_de_passe_bd', 'mot_de_passe_ftp', 'utilisateur_ftp',
+        'mot_de_passe_proxy', 'utilisateur_proxy', 'clé_stockage', 'clé_api_google',
+        'clé_api_aws', 'clé_api_firebase', 'jeton_session', 'clé_api_stripe',
+        'jeton_github', 'jeton_gitlab', 'jeton_slack', 'jeton_discord',
+        'url_base_donnees', 'mot_de_passe_smtp', 'utilisateur_smtp'
+    ]
+
+    for i, line in enumerate(lines, start=1):
+        comments = re.findall(r'<!--(.*?)-->', line, re.DOTALL)
+        for comment in comments:
+            if any(kw in comment.lower() for kw in keywords):
+                sensitive_comments.append((i, comment.strip()))
+    return sensitive_comments
+
+
+def extract_keywords(html):
+    """Extract sensitive keywords and list all the lines where they appear"""
+    lines = html.split("\n")
+    keyword_matches = {}
+
+    keywords = [
+        'password', 'passwd', 'pwd', 'secret', 'token', 'api_key', 'apikey', 
+        'auth', 'authorization', 'bearer', 'jwt', 'access_token', 'refresh_token',
+        'client_secret', 'client_id', 'private_key', 'public_key', 'ssh_key',
+        'oauth', 'oauth_token', 'aws_access_key', 'aws_secret_key', 
+        'google_api_key', 'firebase_api_key', 'stripe_api_key', 'github_token',
+        'gitlab_token', 'slack_token', 'discord_token', 'webhook', 'credentials',
+        'database_url', 'db_password', 'db_user', 'smtp_password', 'smtp_user',
+        'ftp_password', 'ftp_user', 'proxy_password', 'proxy_user', 'encryption_key',
+        'crypt_key', 'master_key', 'root_password', 'admin_password', 'superuser',
+        'keystore', 'hmac_key'
+    ]
+
+    for i, line in enumerate(lines, start=1):
+        for keyword in keywords:
+            if keyword in line.lower():
+                if keyword not in keyword_matches:
+                    keyword_matches[keyword] = []
+                keyword_matches[keyword].append(i)
+    return keyword_matches
+
+
+def check_url_exists(url):
+    """Check if a URL exists by sending a HEAD request"""
+    try:
+        response = requests.head(url, timeout=5, allow_redirects=True)
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
+
+
+def process_page(url):
+    """Download and analyze a page to extract emails, phone numbers, sensitive files, and confidential information"""
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            html_content = response.text
+            
+            emails = extract_emails(html_content)
+            for email in emails:
+                print(f"{G}[+] {Y}Found email : {G}{email}")
+
+            phones = extract_french_phone_numbers(html_content)
+            for phone in phones:
+                print(f"{G}[+] {Y}Found phone number : {G}{phone}")
+
+            sensitive_urls = extract_sensitive_urls(html_content)
+            for sensitive_url in sensitive_urls:
+                if check_url_exists(urljoin(url, sensitive_url)):
+                    print(f"{G}[🔗] {Y}Accessible sensitive URL found : {G}{urljoin(url, sensitive_url)}")
+
+            source_code_urls = extract_source_code_urls(html_content)
+            for source_url in source_code_urls:
+                print(f"{G}[🔗] {Y}Found interesting link : {G}{source_url}")
+
+            sensitive_data = extract_sensitive_data(html_content)
+            for label, values in sensitive_data.items():
+                for value in values:
+                    print(f"{G}[!] {Y}Found {C}{label} {Y}: {G}{value}")
+
+            keywords_found = extract_keywords(html_content)
+            for keyword, lines in keywords_found.items():
+                print(f"{G}[Keyword] {Y}'{C}{keyword}{Y}' found at lines : {G}{', '.join(map(str, lines))}")
+
+            comments = extract_sensitive_comments(html_content)
+            for comment in comments:
+                print(f"{G}[+] {Y}Sensitive comment found : {G}{comment}")
+            return emails, phones, sensitive_urls, source_code_urls, sensitive_data
+    except requests.exceptions.RequestException as e:
+        print(f"{M}[!] {R}Error processing {url} : {e}")
+        
+    return set(), set(), set(), set(), {}
+
 
 ###############################################################################################################
 ############################################## Scan urls / domains ############################################
@@ -1612,6 +1954,7 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose mode")
     parser.add_argument("-e", "--extract", action="store_true", help="extract links from url")
     parser.add_argument("-d", "--depth", type=int, default=1, help="Crawling depth (default: 1)")
+    parser.add_argument('--wtf', action="store_true", help=f"Search for stored infos as emails, tokens, phone numbers, api keys, etc ...")
     parser.add_argument("-w", "--wayback", action="store_true", help="Include Wayback Machine URLs")
     parser.add_argument("-r", "--robots", action="store_true", help="Try to extract urls from robots.txt and sitemap.xml")
     parser.add_argument("-n", "--normalize", action="store_true", 
@@ -2022,7 +2365,6 @@ def main():
             crlfScan(url, payloads, cookies, outputlist)
 
     if args.infos:
-        
         parsed_url = urlparse(args.url)
         domain = parsed_url.netloc
         extracted = tldextract.extract(domain)
@@ -2041,7 +2383,21 @@ def main():
         print(f"{M}[+] {G}Headers ...\n", response.headers)
         conn.close()
 
-        
+
+    if args.wtf:
+        if args.wayback or args.extract:
+            print(f"{M}[Info] {C}Searching for sensitive data on base target {args.url}...")
+            for links in outputlist:
+                print(f"\n{M}[!] {C}[view-source:{links}]")
+                process_page(links)
+        else:    
+            if not args.url.startswith(('http://', 'https://')):
+                args.url = 'http://' + args.url
+            print(f"{M}[Info] {C}Searching for sensitive data on {args.url}...")
+            print(f"\n{M}[!] {C}[view-source:{args.url}]")
+            process_page(args.url)  
+
+      
     # Save results to a file if requested
     if args.output:
         print(f"\n{M}[Info] {C}Saving output file ...")
