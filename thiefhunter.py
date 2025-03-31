@@ -25,7 +25,7 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-banner = f'''
+banner = rf'''
 
 {C} _   _     _       __ {W} _                 {R} _            
 {C}| |_| |__ (_) ___ / _|{W}| |__  _   _ _ __  {R}| |_ ___ _ __ 
