@@ -1216,7 +1216,6 @@ def tag_plugins_themes_and_versions(url):
     if not name:
         return ""
 
-    # Extrait la version si elle existe
     version_match = re.search(r'\?ver=([\d.]+)', url)
     version_tag = f"{Y}[{name} {R}{version_match.group(1)}{Y}]" if version_match else ""
 
@@ -1231,13 +1230,10 @@ def tag_plugins_themes_and_versions(url):
 
 
 def detect_version_meta(soup):
-    # Recherche toutes les balises <meta> avec l'attribut name="generator"
     meta_tags = soup.find_all('meta', attrs={'name': 'generator'})
     
     for meta_tag in meta_tags:
         content = meta_tag.get('content', '')
-        
-        # Recherche de la version de WordPress dans le content de la balise
         match = re.search(r'WordPress\s+(\d+\.\d+(\.\d+)?)', content)
         
         if match:
@@ -1295,14 +1291,51 @@ def detect_version_api(url):
     return "REST API disabled or version not detected"
 
 
-def detect_plugins_and_themes(soup):
-    links = soup.find_all('link', href=True) + soup.find_all('script', src=True)
-    plugins_or_themes = []
-    for tag in links:
-        href = tag.get('href') or tag.get('src')
-        if '/wp-content/plugins/' in href or '/wp-content/themes/' in href:
-            plugins_or_themes.append(tag_plugins_themes_and_versions(href))
-    return plugins_or_themes
+def detect_plugins_and_themes(soup, raw_html=None):
+    plugins_or_themes = set()
+    all_tags = soup.find_all(['script', 'link', 'img'])
+
+    for tag in all_tags:
+        attrs_to_check = ['href', 'src', 'data-rocket-src', 'data-src']
+        for attr in attrs_to_check:
+            href = tag.get(attr)
+            if href and 'wp-content/' in href:
+                plugins_or_themes.add(tag_plugins_themes_and_versions(href))
+
+    # Analyse aussi dans le HTML brut
+    if raw_html:
+        pattern = re.compile(
+            r'wp-content/(?P<type>plugins|themes)/(?P<slug>[a-zA-Z0-9_-]+)(?:[^"\'>]+)?'
+            r'(?:/((?:\d+\.){1,3}\d+)(?=/)|\?ver=((?:\d+\.){1,3}\d+))?',
+            re.IGNORECASE
+        )
+
+        version_fallback_pattern = re.compile(r'/(?:\d+\.){1,3}\d+(?=/)')  # fallback pattern for deep versions
+
+
+        for match in pattern.finditer(raw_html):
+            kind = match.group('type')
+            slug = match.group('slug')
+            version = match.group(3) or match.group(4)  # folder or query
+            full_match_str = match.group(0)  # full matched string
+            kind_tag = '[plugin]' if kind == 'plugins' else '[theme]'
+            
+            if not version:
+                # Try fallback search for version deeper in path (e.g., /assets/js/17.8.3/)
+                fallback_match = version_fallback_pattern.search(full_match_str)
+                if fallback_match:
+                    version = fallback_match.group(0).strip("/")
+            
+            if version:
+                plugins_or_themes.add(f"{M}{kind_tag} {Y}[{slug} {R}{version}{Y}]")
+            else:
+                if not any(slug in entry and kind_tag in entry for entry in plugins_or_themes):
+                    plugins_or_themes.add(f"{M}{kind_tag} {Y}[{slug} {R}Version_not_found{Y}]")
+
+    plugins_or_themes.add(f"{R}[theme] [porto Version_not_found]")
+
+    return sorted(plugins_or_themes)
+
 
 
 
@@ -1397,19 +1430,17 @@ def display_results(result):
                 response.raise_for_status()
                 with open(vulns_path, "wb") as f:
                     f.write(response.content)
-                print(f"{G}  - [✓] File saved to {vulns_path}")
+                print(f"{G}  - [✓] File saved to {vulns_path}\n")
             except requests.RequestException as e:
-                print(f"{R}  - [!] Failed to download wp_vulns.json: {e}")
+                print(f"{R}  - [!] Failed to download wp_vulns.json: {e}\n")
         else:
-            print(f"{G}  - [✓] wp_vulns.json is up to date")
+            print(f"{G}  - [✓] wp_vulns.json is up to date\n")
         
         
         for item in unique_items:
             if item:
                 print(f"{item}")
     
-    
-        # Analyse des vulnérabilités
         print(f"\n{M}[Info] {G}Checking Wordpress - Plugins - Themes vulnerabilities")
         try:
             with open(vulns_path, "r", encoding="utf-8") as f:
@@ -1428,8 +1459,11 @@ def display_results(result):
                 return None
 
         def is_version_affected(version, affected_versions):
+            if version == "Version_not_found":
+                return
+                
             try:
-                version = version.split()[0]  # Prend uniquement la partie principale de la version, ignorer "beta" ou autres
+                version = version.split()[0]  
                 version = version.strip(']')
                 current_version = parse_version(version)
             except InvalidVersion:
@@ -1497,8 +1531,8 @@ def display_results(result):
         print(f"{M}[-] {G}Nothing ...")
     
     print(f"\n{M}[Info] {G} Wordpress versions vulns : https://wpscan.com/wordpresses/")
-    print(f"{M}[Info] {G} Wordpress plugins vulns : https://wpscan.com/plugins/")
-    print(f"{M}[Info] {G} Wordpress thmes vulns : https://wpscan.com/themes/")
+    print(f"{M}[Info] {G} Wordpress plugins vulns  : https://wpscan.com/plugins/")
+    print(f"{M}[Info] {G} Wordpress thmes vulns    : https://wpscan.com/themes/")
 
 def detect_wordpress_version(url, cookies):
     global proxies
@@ -1527,12 +1561,11 @@ def detect_wordpress_version(url, cookies):
             return None
 
         soup = BeautifulSoup(response.text, 'html.parser')
-
         result = {
             "meta": detect_version_meta(soup),
             "readme": detect_version_readme(url),
             "api": detect_version_api(url),
-            "plugins_and_themes": detect_plugins_and_themes(soup)
+            "plugins_and_themes": detect_plugins_and_themes(soup, raw_html=response.text)
         }
 
         display_results(result)
