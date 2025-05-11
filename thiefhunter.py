@@ -1332,8 +1332,6 @@ def detect_plugins_and_themes(soup, raw_html=None):
                 if not any(slug in entry and kind_tag in entry for entry in plugins_or_themes):
                     plugins_or_themes.add(f"{M}{kind_tag} {Y}[{slug} {R}Version_not_found{Y}]")
 
-    plugins_or_themes.add(f"{R}[theme] [porto Version_not_found]")
-
     return sorted(plugins_or_themes)
 
 
