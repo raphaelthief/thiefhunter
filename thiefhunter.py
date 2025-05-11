@@ -1465,7 +1465,9 @@ def display_results(result):
                 version = version.strip(']')
                 current_version = parse_version(version)
             except InvalidVersion:
-                print(f"{R}[Error_info] Invalid version detected (may be a false positive)\n{Y} --> {version}")
+                max_length = 80
+                short_range = version_range[:max_length] + "..." if len(version_range) > max_length else version_range
+                print(f"{C} | {R}[Error_info] {G}Invalid version detected (may be a false positive)\n{C} | {Y} --> {short_range}")
                 return False
 
             for version_range in affected_versions.values():
@@ -1479,7 +1481,9 @@ def display_results(result):
                     from_v = parse_version(from_v_raw) if from_v_raw != "*" else None
                     to_v = parse_version(to_v_raw) if to_v_raw != "*" else None
                 except InvalidVersion:
-                    print(f"{R}[Error_info] Invalid range version detected (may be a false positive)\n{Y} --> {version_range}")
+                    max_length = 80
+                    short_range = version_range[:max_length] + "..." if len(version_range) > max_length else version_range
+                    print(f"{C} | {R}[Error_info] {G}Invalid range version detected (may be a false positive)\n{C} |{Y} --> {short_range}")
                     continue
 
                 from_ok = (current_version >= from_v) if from_v else True
@@ -1511,16 +1515,18 @@ def display_results(result):
                             vuln_found_for_item = True
                             found = True
                             affected_ranges = ', '.join(affected.keys())
-                            print(f"{R}[!] {G}{item_type.title()} {item_slug} {item_version} - {v['title']}")
-                            #print(f"{C}    ↳ {G}Description      : {Y}{v['description'][:150]}...")
-                            print(f"{C}[?] {G}Description \n{Y}{v['description']}\n{C}-----")
-                            print(f"{C}    ↳ {G}Affected version : {Y}{affected_ranges}")
-                            print(f"{C}    ↳ {G}Remediation      : {Y}{software.get('remediation', 'N/A')}")
-                            print(f"{C}    ↳ {G}CVSS Score       : {Y}{v['cvss']['score']} ({v['cvss']['rating']})")
-                            print(f"{C}    ↳ {G}Reference        : {Y}{v['references'][0]}\n")
+                            print(f"{C} |  {R}[!] {G}{item_type.title()} {item_slug} {item_version} - {v['title']}")
+                            print(f"{C} |   ↳ {G}Description      : {Y}{v['description'][:90]}...")
+                            print(f"{C} |   ↳ {G}Affected version : {Y}{affected_ranges}")
+                            print(f"{C} |   ↳ {G}Remediation      : {Y}{software.get('remediation', 'N/A')[:90]}...")
+                            print(f"{C} |   ↳ {G}CVSS Score       : {Y}{v['cvss']['score']} ({v['cvss']['rating']})")
+                            full_url = v['references'][0]
+                            if full_url.endswith('?source=api-prod'):
+                                full_url = full_url.removesuffix('?source=api-prod')
+                            print(f"{C} |   ↳ {G}Reference        : {Y}{full_url}\n{C} |")
             
             if not vuln_found_for_item:
-                print(f"{C}    ↳ {M}No vulnerabilites found\n")
+                print(f"{C} |   ↳ {M}No vulnerabilites found\n{C} |")
 
         if not found:
             print(f"{G}  - [✓] Wordpress - Plugins - Themes are up to date")
