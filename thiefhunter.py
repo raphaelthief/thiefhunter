@@ -1,9 +1,10 @@
-import argparse, requests, time, re, warnings, tldextract, urllib3, os, difflib, logging, random, threading, signal, sys, subprocess, shlex, pprint, http.client
+import argparse, requests, time, re, warnings, tldextract, urllib3, os, difflib, logging, random, threading, signal, sys, subprocess, shlex, pprint, http.client, json, textwrap
 import concurrent.futures
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin, parse_qs, parse_qsl, urlencode, urlunparse
 from colorama import init, Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from packaging.version import parse as parse_version, InvalidVersion
 
 init() # Init colorama
 
@@ -1171,8 +1172,29 @@ def robots(domain, cookies):
 ################################################## WordPress ##################################################
 ###############################################################################################################
 
+def aggregate_plugins_and_themes(soup):
+    raw_links = soup.find_all(['link', 'script'], href=True) + soup.find_all('script', src=True)
+    version_data = defaultdict(list)
+
+    for tag in raw_links:
+        href = tag.get('href') or tag.get('src')
+        result = tag_plugins_themes_and_versions(href)
+        if result:
+            tag_type, name, version = result
+            version_data[(tag_type, name)].append(version)
+
+    final_results = []
+    for (tag_type, name), versions in version_data.items():
+        most_common_version = Counter(versions).most_common(1)[0][0]
+        colored = f"{M}{tag_type} {Y}[{name} {R}{most_common_version}{Y}]"
+        final_results.append(colored)
+
+    return sorted(final_results)
+
 
 def tag_plugins_themes_and_versions(url):
+    name = None  
+    tag = None   
 
     # Plugins
     if '/wp-content/plugins/' in url:
@@ -1191,22 +1213,38 @@ def tag_plugins_themes_and_versions(url):
         tag = f"[other]"
 
 
+    if not name:
+        return ""
+
     # Extrait la version si elle existe
     version_match = re.search(r'\?ver=([\d.]+)', url)
     version_tag = f"{Y}[{name} {R}{version_match.group(1)}{Y}]" if version_match else ""
 
+    if not version_tag:
+        return ""
+
     if verbosity == "yes":
         final_result = f"{M}{tag} {version_tag} {G}{url}"
     else:
-        final_result = f"{M}{tag} {version_tag}"
-        
+        final_result = f"{M}{tag} {version_tag}"        
     return final_result
 
+
 def detect_version_meta(soup):
-    meta_tag = soup.find('meta', attrs={'name': 'generator'})
-    if meta_tag and 'WordPress' in meta_tag['content']:
-        return meta_tag['content']
-    return "Meta version: unknown ..."
+    # Recherche toutes les balises <meta> avec l'attribut name="generator"
+    meta_tags = soup.find_all('meta', attrs={'name': 'generator'})
+    
+    for meta_tag in meta_tags:
+        content = meta_tag.get('content', '')
+        
+        # Recherche de la version de WordPress dans le content de la balise
+        match = re.search(r'WordPress\s+(\d+\.\d+(\.\d+)?)', content)
+        
+        if match:
+            # Si une version WordPress est trouvée, retourner la version
+            return f"WordPress {match.group(1)}"
+    return "unknown ..."
+    
 
 def detect_version_assets(soup):
     links = soup.find_all('link', href=True) + soup.find_all('script', src=True)
@@ -1215,17 +1253,15 @@ def detect_version_assets(soup):
         if '?ver=' in href:
             version = href.split('?ver=')[-1]
             return version
-    return "Assets: unknown ..."
+    return "unknown ..."
 
 def detect_version_readme(url):
     response = requests.get(f"{url}/readme.html")
     if response.status_code == 200:
-        if "WordPress" in response.text:
-            lines = response.text.splitlines()
-            for line in lines:
-                if "WordPress" in line:
-                    return line.strip()
-    return "readme.html not found"
+        version_match = re.search(r'WordPress (\d+\.\d+\.\d+)', response.text)
+        if version_match:
+            return f"WordPress {version_match.group(1)}"
+    return "N/A"
 
 def detect_version_by_files(url):
     response = requests.get(f"{url}/wp-includes/version.php")
@@ -1239,15 +1275,25 @@ def detect_version_by_files(url):
     return "version.php not found"
 
 def detect_version_api(url):
-    response = requests.get(f"{url}/wp-json/")
-    if response.status_code == 200:
-        try:
-            data = response.json()
-            if 'generator' in data.get('meta', {}):
-                return data['meta']['generator']
-        except ValueError:
-            pass  # JSON malformé
-    return "API REST désactivée ou version non détectée"
+    try:
+        response = requests.get(f"{url}/wp-json/", timeout=10)
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                if 'meta' in data and 'generator' in data['meta']:
+                    return data['meta']['generator']
+                return "REST API is active but version not found"
+            except ValueError:
+                return "REST API is active but malformed JSON"
+        elif response.status_code == 403:
+            return "REST API access denied (403)"
+        elif response.status_code == 404:
+            return "REST API endpoint not found (404)"
+    except requests.RequestException as e:
+        return f"REST API error: {e}"
+
+    return "REST API disabled or version not detected"
+
 
 def detect_plugins_and_themes(soup):
     links = soup.find_all('link', href=True) + soup.find_all('script', src=True)
@@ -1297,14 +1343,159 @@ def enumerate_users_via_wp_json(url):
 
 
 
+
+
+def remove_ansi_codes(text):
+    return re.sub(r'\x1b\[[0-9;]*m', '', text)
+
+
+def is_version_affected(target_version, affected_versions):
+    for spec, vdata in affected_versions.items():
+        from_ver = vdata['from_version']
+        to_ver = vdata['to_version']
+        from_inc = vdata['from_inclusive']
+        to_inc = vdata['to_inclusive']
+        try:
+            if from_ver != '*' and (version.parse(target_version) < version.parse(from_ver) or 
+                                    (not from_inc and version.parse(target_version) == version.parse(from_ver))):
+                continue
+            if version.parse(target_version) > version.parse(to_ver) or \
+               (not to_inc and version.parse(target_version) == version.parse(to_ver)):
+                continue
+            return True
+        except Exception:
+            continue
+    return False
+    
+
 def display_results(result):
     print(f"{M}[Meta Tag Version]{G} : {result['meta']}")
-    print(f"{M}[Assets Version]{G}   : {result['assets']}")
     print(f"{M}[Readme Version]{G}   : {result['readme']}")
     print(f"{M}[API Version]{G}      : {result['api']}")
     print(f"\n{M}[Info] {G}Plugins and Themes Detected")
-    for item in result['plugins_and_themes']:
-        print(f"{item}")
+    
+    unique_items = sorted(set(result['plugins_and_themes']))
+
+    wordpress_version = None
+    if 'meta' in result and 'wordpress' in result['meta'].lower():
+        wordpress_version = result['meta'].split()[-1]  # Récupère la version à partir de meta
+    elif 'readme' in result and 'wordpress' in result['readme'].lower():
+        wordpress_version = result['readme'].split()[-1]  # Récupère la version à partir de readme
+    elif 'api' in result and 'wordpress' in result['api'].lower():
+        wordpress_version = result['api'].split()[-1]  # Récupère la version à partir de API
+
+    if wordpress_version:
+        unique_items.append(f"{M}[core]   {Y}[wordpress {R}{wordpress_version}{Y}]")
+
+     
+    if unique_items:
+        vulns_path = "payloads/wp_vulns.json"
+        if not os.path.isfile(vulns_path) or (time.time() - os.path.getmtime(vulns_path)) > 86400:
+            print(f"{G}   - [i] wp_vulns.json is missing or outdated. Downloading a fresh copy...")
+            try:
+                response = requests.get("https://www.wordfence.com/api/intelligence/v2/vulnerabilities/production", timeout=10)
+                response.raise_for_status()
+                with open(vulns_path, "wb") as f:
+                    f.write(response.content)
+                print(f"{G}  - [✓] File saved to {vulns_path}")
+            except requests.RequestException as e:
+                print(f"{R}  - [!] Failed to download wp_vulns.json: {e}")
+        else:
+            print(f"{G}  - [✓] wp_vulns.json is up to date")
+        
+        
+        for item in unique_items:
+            if item:
+                print(f"{item}")
+    
+    
+        # Analyse des vulnérabilités
+        print(f"\n{M}[Info] {G}Checking Wordpress - Plugins - Themes vulnerabilities")
+        try:
+            with open(vulns_path, "r", encoding="utf-8") as f:
+                vulns_data = json.load(f)
+        except Exception as e:
+            print(f"{R}  - [x] Failed to load JSON file : {e}")
+            return
+
+        def extract_item_info(clean_item):
+            match = re.match(r"\[(plugin|theme)\]\s*\[\s*([^\s\]]+)\s+([^\]]+)\s*\]", clean_item)
+            if match:
+                return match.groups()  # type, slug, version
+            elif "wordpress" in clean_item.lower():
+                return ("core", "wordpress", clean_item.split()[-1])  # exemple: 'wordpress 6.5.2'
+            else:
+                return None
+
+        def is_version_affected(version, affected_versions):
+            try:
+                version = version.split()[0]  # Prend uniquement la partie principale de la version, ignorer "beta" ou autres
+                version = version.strip(']')
+                current_version = parse_version(version)
+            except InvalidVersion:
+                print(f"{R}[Error_info] Invalid version detected (may be a false positive)\n{Y} --> {version}")
+                return False
+
+            for version_range in affected_versions.values():
+                from_v_raw = version_range.get("from_version", "0")
+                to_v_raw = version_range.get("to_version", "9999")
+
+                try:
+                    # Handle wildcards
+                    if from_v_raw == "*" and to_v_raw == "*":
+                        return True
+                    from_v = parse_version(from_v_raw) if from_v_raw != "*" else None
+                    to_v = parse_version(to_v_raw) if to_v_raw != "*" else None
+                except InvalidVersion:
+                    print(f"{R}[Error_info] Invalid range version detected (may be a false positive)\n{Y} --> {version_range}")
+                    continue
+
+                from_ok = (current_version >= from_v) if from_v else True
+                to_ok = (current_version <= to_v) if to_v else True
+
+                if from_ok and to_ok:
+                    return True
+
+            return False
+        
+        found = False
+        for item in unique_items:
+            clean_item = remove_ansi_codes(item)            
+            info = extract_item_info(clean_item)
+            if not info:
+                continue
+            
+            item_type, item_slug, item_version = info
+            print(f"{G}[+] {Y}{item_slug} {R}{item_version}")
+            vuln_found_for_item = False
+            for v in vulns_data.values():
+                for software in v.get("software", []):
+                    vuln_type = software.get("type")
+                    vuln_slug = software.get("slug")
+                    
+                    if vuln_type == item_type and vuln_slug.lower() == item_slug.lower():
+                        affected = software.get("affected_versions", {})
+                        if is_version_affected(item_version, affected):
+                            vuln_found_for_item = True
+                            found = True
+                            affected_ranges = ', '.join(affected.keys())
+                            print(f"{R}[!] {G}{item_type.title()} {item_slug} {item_version} - {v['title']}")
+                            #print(f"{C}    ↳ {G}Description      : {Y}{v['description'][:150]}...")
+                            print(f"{C}[?] {G}Description \n{Y}{v['description']}\n{C}-----")
+                            print(f"{C}    ↳ {G}Affected version : {Y}{affected_ranges}")
+                            print(f"{C}    ↳ {G}Remediation      : {Y}{software.get('remediation', 'N/A')}")
+                            print(f"{C}    ↳ {G}CVSS Score       : {Y}{v['cvss']['score']} ({v['cvss']['rating']})")
+                            print(f"{C}    ↳ {G}Reference        : {Y}{v['references'][0]}\n")
+            
+            if not vuln_found_for_item:
+                print(f"{C}    ↳ {M}No vulnerabilites found\n")
+
+        if not found:
+            print(f"{G}  - [✓] Wordpress - Plugins - Themes are up to date")
+    
+    else:
+        print(f"{M}[-] {G}Nothing ...")
+    
     print(f"\n{M}[Info] {G} Wordpress versions vulns : https://wpscan.com/wordpresses/")
     print(f"{M}[Info] {G} Wordpress plugins vulns : https://wpscan.com/plugins/")
     print(f"{M}[Info] {G} Wordpress thmes vulns : https://wpscan.com/themes/")
@@ -1331,7 +1522,7 @@ def detect_wordpress_version(url, cookies):
             
         response = requests.get(url, timeout=15, proxies=proxies, headers=headers, cookies=cookies, verify=False) # Disable SSL verification
         if response.status_code != 200:
-            print(f"{M}[Error] {R}Unable to access the site")
+            print(f"{M}[Error] {R}Unable to access to target")
             print("")
             return None
 
@@ -1339,7 +1530,6 @@ def detect_wordpress_version(url, cookies):
 
         result = {
             "meta": detect_version_meta(soup),
-            "assets": detect_version_assets(soup),
             "readme": detect_version_readme(url),
             "api": detect_version_api(url),
             "plugins_and_themes": detect_plugins_and_themes(soup)
@@ -1499,20 +1689,20 @@ def test_path_traversal(url, payload, cookies):
 def fetch_rdap_info(domain):
     url = f"https://rdap.verisign.com/com/v1/domain/{domain}"
     try:
-        print(f"\n{M}[+] {G}Domain information")
+        print(f"{M}[Info] {G}Domain information")
         response = requests.get(url, timeout=10) 
         if response.status_code == 200:
             data = response.json()
             print_rdap_info(data)
         elif response.status_code == 404:
-            print(f"{M}[Info] {G}No information available for this domain ({response.status_code})")
+            print(f"{M}[-] {G}No information available for this domain ({response.status_code})")
         else:
             print(f"{M}[Error] {R}Unexpected error : HTTP Status {response.status_code}")
     except requests.RequestException as e:
         print(f"{M}[Error] {R}{e}")
 
 def print_rdap_info(data):
-    print(f"{M}[Info] {G}Domain name : {Y}{data.get('ldhName', 'N/A')}")
+    print(f"{M}[+] {G}Domain name : {Y}{data.get('ldhName', 'N/A')}")
     
     # Statuses
     statuses = data.get("status", [])
@@ -1739,7 +1929,6 @@ def analyze_response(resp, final_url):
         return {"error": str(e)}
 
 
-# Function to audit a page by its URL
 def audit_page(url, cookies):
     global proxies
     
@@ -1758,13 +1947,8 @@ def audit_page(url, cookies):
             proxies = tor_proxies
 
         response = requests.get(url, proxies=proxies, headers=headers, cookies=cookies)
-        print(f"\n{M}[Info] {C}Basic audit report for : {url}\n")
-        print(f"{M}[+] {G}Headers info...")
-        # Print all response headers
-        for header, value in response.headers.items():
-            print(f"{G}{header}: {Y}{value}")
-        print("")
-        
+        print(f"\n{M}[Info] {C}Basic infos report for : {Y}{url}\n----------\n")
+
         print(f"{M}[+] {G}Searching for click-hijacking vulnerabilities...")
         hijacking = check_clickjacking_protection(url)
         print(hijacking)        
@@ -1773,11 +1957,69 @@ def audit_page(url, cookies):
         print(f"{M}[+] {G}Code review...")
         
         result = analyze_response(response, url)
-
-        # Display audit report
+        
+        # Display report
+        maxlen = max(len(key) for key in result.keys() if not isinstance(result[key], list))
         for key, value in result.items():
             if not isinstance(value, list):
-                print(f"{M}[{key}] {G}{value}")
+                spacing = " " * (maxlen - len(key))
+                print(f"{M}[{key}]{spacing} {G}--> {Y}{value}")
+
+
+        print(f"\n{M}[Info] {G}Headers info...")
+        # Print all response headers
+        version_pattern = re.compile(
+            r"("
+            r"PHP|ASP\.NET|Apache|nginx|LiteSpeed|IIS|Node\.js|Express|"
+            r"Django|Flask|Laravel|Symfony|Spring|Jetty|Tomcat|"
+            r"WordPress|Joomla|Drupal|Magento|Shopify|Wix|Squarespace|Prestashop|"
+            r"Ubuntu|Debian|CentOS|Red Hat|Fedora|Alpine|Windows|FreeBSD|OpenBSD|"
+            r"OpenSSL|LibreSSL|BoringSSL|cURL|wget|"
+            r"AWS|Amazon|CloudFront|Cloudflare|Akamai|Fastly|"
+            r"Python|Perl|Ruby|Go|Rust|Java|Mono|"
+            r"MySQL|PostgreSQL|MariaDB|SQLite|MongoDB|Redis|ElasticSearch|"
+            r"React|Angular|Vue\.js|Svelte|jQuery|Next\.js|Nuxt|Ember|Backbone|middleware|"
+            r"Webpack|Babel|Grunt|Gulp|Vite|Rollup|"
+            r"CVSS|CVE"
+            r")[/ ]?[\w\.-]*\d[\w\.-]*",
+            re.IGNORECASE
+        )
+
+        middleware_headers = {
+            "serveurs": ["Server", "X-AspNet-Version", "X-Powered-By", "X-AspNetMvc-Version", "X-Runtime", "X-Python-Version"],
+            "cms/frameworks": ["X-Generator", "X-Pingback", "X-Drupal-Cache"],
+            "cdn/waf": ["CF-RAY", "CF-Cache-Status", "X-Amz-Cf-Id", "X-Amzn-Trace-Id", "X-Akamai-", "X-Fastly-", "X-CDN"],
+            "proxies/load_balancers": ["Via", "X-Forwarded-For", "X-Real-IP", "X-Served-By", "X-Cache", "X-Backend-Server", "X-Proxy-Cache", "x-middleware-subrequest"]
+        }
+
+        maxlen = max(len(header) for header in response.headers.keys())
+
+        for header, value in response.headers.items():
+            match = version_pattern.search(value)
+            is_flagged0 = False
+            if match:
+                highlighted = value.replace(match.group(), f"{R}{match.group()}{Y}")
+                is_flagged0 = True
+            else:
+                highlighted = value
+
+            is_flagged = False
+            for patterns in middleware_headers.values():
+                for pattern in patterns:
+                    if pattern.lower() in header.lower():
+                        is_flagged = True
+                        break
+                if is_flagged:
+                    break
+
+            spacing = " " * (maxlen - len(header))  # alignement
+            if is_flagged:
+                print(f"{R}[!] {header}{spacing} {G}: {Y}{highlighted}")
+            else:
+                if is_flagged0:
+                    print(f"{R}[!] {G}{header}{spacing} {G}: {Y}{highlighted}")
+                else:    
+                    print(f"    {G}{header}{spacing} {G}: {Y}{highlighted}")
 
     except requests.RequestException as e:
         print(f"{M}[Error] {R}Failed to fetch {url}: {e}")
@@ -2304,7 +2546,6 @@ def main():
         paths_to_check = [
             "wp-admin/",
             "wp-login.php",
-            "wp-content/",
             "wp-content/uploads/",
             "wp-json/wp/v2/users",
             "wp-json/wp/v2/posts",
@@ -2370,7 +2611,6 @@ def main():
         extracted = tldextract.extract(domain)
         base_domain = f"{extracted.domain}.{extracted.suffix}"        
         audit_page(args.url, cookies)
-        fetch_rdap_info(base_domain)
         
         # TRACE request ...
         host = parsed_url.hostname
@@ -2379,9 +2619,101 @@ def main():
         conn.request("TRACE", path)
         response = conn.getresponse()
         print(f"\n{M}[Info] {G}TRACE request :")
-        print(f"{M}[+] {G}Statut  : {Y}", response.status)
-        print(f"{M}[+] {G}Headers ...\n", response.headers)
+        print(f"{M}[+] {G}Statut  :{Y}", response.status)
+        print(f"{M}[+] {G}Headers ...")
+        version_pattern = re.compile(
+            r"("
+            r"PHP|ASP\.NET|Apache|nginx|LiteSpeed|IIS|Node\.js|Express|"
+            r"Django|Flask|Laravel|Symfony|Spring|Jetty|Tomcat|"
+            r"WordPress|Joomla|Drupal|Magento|Shopify|Wix|Squarespace|Prestashop|"
+            r"Ubuntu|Debian|CentOS|Red Hat|Fedora|Alpine|Windows|FreeBSD|OpenBSD|"
+            r"OpenSSL|LibreSSL|BoringSSL|cURL|wget|"
+            r"AWS|Amazon|CloudFront|Cloudflare|Akamai|Fastly|"
+            r"Python|Perl|Ruby|Go|Rust|Java|Mono|"
+            r"MySQL|PostgreSQL|MariaDB|SQLite|MongoDB|Redis|ElasticSearch|"
+            r"React|Angular|Vue\.js|Svelte|jQuery|Next\.js|Nuxt|Ember|Backbone|middleware|"
+            r"Webpack|Babel|Grunt|Gulp|Vite|Rollup|"
+            r"CVSS|CVE"
+            r")[/ ]?[\w\.-]*\d[\w\.-]*",
+            re.IGNORECASE
+        )
+
+        middleware_headers = {
+            "serveurs": ["Server", "X-AspNet-Version", "X-Powered-By", "X-AspNetMvc-Version", "X-Runtime", "X-Python-Version"],
+            "cms/frameworks": ["X-Generator", "X-Pingback", "X-Drupal-Cache"],
+            "cdn/waf": ["CF-RAY", "CF-Cache-Status", "X-Amz-Cf-Id", "X-Amzn-Trace-Id", "X-Akamai-", "X-Fastly-", "X-CDN"],
+            "proxies/load_balancers": ["Via", "X-Forwarded-For", "X-Real-IP", "X-Served-By", "X-Cache", "X-Backend-Server", "X-Proxy-Cache", "x-middleware-subrequest"]
+        }
+
+        maxlen = max(len(header) for header in response.headers.keys())
+
+        for header, value in response.headers.items():
+            # Recherche d'une version de techno
+            match = version_pattern.search(value)
+            is_flagged0 = False
+            if match:
+                highlighted = value.replace(match.group(), f"{R}{match.group()}{Y}")
+                is_flagged0 = True
+            else:
+                highlighted = value
+
+            # Vérifier si c'est un header "sensible"
+            is_flagged = False
+            for patterns in middleware_headers.values():
+                for pattern in patterns:
+                    if pattern.lower() in header.lower():
+                        is_flagged = True
+                        break
+                if is_flagged:
+                    break
+
+            spacing = " " * (maxlen - len(header))  # alignement des colonnes
+            if is_flagged:
+                print(f"{R}[!] {header}{spacing} {G}: {Y}{highlighted}")
+            else:
+                if is_flagged0:
+                    print(f"{R}[!] {G}{header}{spacing} {G}: {Y}{highlighted}")
+                else:
+                    print(f"    {G}{header}{spacing} {G}: {Y}{highlighted}")
+        print("")
         conn.close()
+           
+        fetch_rdap_info(base_domain)
+
+        print(f"\n{M}[Info] {G}Checking robots & sitemap")
+        robots_url = urljoin(args.url, "/robots.txt")
+        try:
+            r = requests.get(robots_url, timeout=10)
+            if r.status_code == 200:
+                print(f"{M}[+] {G}Found : {Y}{robots_url}")
+                
+                disallow_paths = re.findall(r"(?i)Disallow:\s*(\S+)", r.text)
+                if disallow_paths:
+                    for path in disallow_paths:
+                        if path.strip() == "/":
+                            continue
+                        full_url = urljoin(args.url, path)
+                        print(f"   {Y}> {G}{full_url}")
+
+                sitemap_links = re.findall(r"(?i)Sitemap:\s*(\S+)", r.text)
+                for link in sitemap_links:
+                    print(f"{M}[+] {G}Found : {Y}{link}")
+                    try:
+                        r = requests.get(link, timeout=10)
+                        if r.status_code == 200:
+                            soup = BeautifulSoup(r.content, "xml")
+                            urls = soup.find_all("loc")
+                            if urls:
+                                for loc in urls:
+                                    print(f"   {Y}> {G}{loc.text}")
+                        else:
+                            print(f"   {R}[!] Could not access: {link}")
+                    except Exception as e:
+                        print(f"   {R}[Error] {e}")
+            else:
+                print(f"{M}[-] Not found : {Y}{robots_url}")
+        except Exception as e:
+            print(f"[Error] {e}")
 
 
     if args.wtf:
