@@ -6,3 +6,4 @@ beautifulsoup4
 colorama
 lxml
 packaging
+wappalyzer
