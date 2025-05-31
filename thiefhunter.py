@@ -2959,45 +2959,6 @@ def is_there_a_vuln(versions, url_target):
     test_reflected_xss(url_target)
     test_php_backup_files(url_target)
     test_sensitive_files(url_target)
-
-
-
-###############################################################################################################
-################################################## github dorks ###############################################
-###############################################################################################################
-def read_github_token(filepath="tokens/github.txt"):
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Token file not found: {filepath}")
-    with open(filepath, "r") as f:
-        token = f.read().strip()
-    return token
-
-def search_github_code(query, token, per_page=10):
-    url = "https://api.github.com/search/code"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json",
-    }
-    params = {
-        "q": query,
-        "per_page": per_page,
-    }
-    response = requests.get(url, headers=headers, params=params)
-    response.raise_for_status()
-    return response.json()
-
-def get_file_content(repo_full_name, file_path, token):
-    url = f"https://api.github.com/repos/{repo_full_name}/contents/{file_path}"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json",
-    }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    return response.json()
-    
-def decode_content(encoded_content):
-    return base64.b64decode(encoded_content).decode('utf-8')
     
 
 ###############################################################################################################
@@ -3038,7 +2999,6 @@ def main():
     parser.add_argument("-cr", '--crlf', action="store_true", help=f"Try to exploit crlf injection. Payloads into payloads/crlf.txt")
     parser.add_argument("-i", '--infos', action="store_true", help=f"Check basics webpage infos (headers, vulnerable source or sinks, Click-Hijacking, ...)")
     parser.add_argument("--vuln", action="store_true", help=f"Check somme vulns in passive mode (next.js middleware)")
-    parser.add_argument("--github", help="Extract GitHub dork search queries paired with AI-generated prompts for analysis")
     parser.add_argument("--dalfox", action="store_true", help="Use dalfox")
     parser.add_argument("--sqlmap", action="store_true", help="Use sqlmap")
     parser.add_argument("--nuclei", action="store_true", help="Use nuclei")
@@ -3069,36 +3029,7 @@ def main():
 
 
     if not (args.url or args.file):
-        if args.github:
-            token = read_github_token()
-
-            query = args.github
-
-            results = search_github_code(query, token)
-            items = results.get("items", [])
-
-            for item in items:
-                repo = item["repository"]["full_name"]
-                path = item["path"]
-                html_url = item["html_url"]
-                print(f"\n---\nFile: {repo}/{path}\nURL: {html_url}")
-
-                # Afficher les extraits textuels retournés par l'API
-                text_matches = item.get("text_matches", [])
-                if text_matches:
-                    for match in text_matches:
-                        fragment = match.get("fragment", "")
-                        print(f"\nExcerpt:\n{fragment}\n{'-'*40}")
-                else:
-                    # Si pas de fragment, afficher les 20 premières lignes par défaut
-                    file_data = get_file_content(repo, path, token)
-                    content = decode_content(file_data["content"])
-                    lines = content.splitlines()
-                    snippet = "\n".join(lines[:20])
-                    print(f"Extrait du fichier (20 premières lignes):\n{snippet}")
-        
-        else:    
-            parser.error("You must specify your search query")
+        parser.error("You must specify your search query")
 
     if args.url and args.file:
         parser.error("You cannot specify both --url and --file at the same time")
