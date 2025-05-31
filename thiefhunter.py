@@ -5,6 +5,8 @@ from urllib.parse import urlparse, urljoin, parse_qs, parse_qsl, urlencode, urlu
 from colorama import init, Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from packaging.version import parse as parse_version, InvalidVersion
+from packaging import version
+from wappalyzer import analyze
 
 init() # Init colorama
 
@@ -988,11 +990,48 @@ def detect_login_page(content):
 
     return False
 
+def highlight_keywords(text, keywords):
+    for kw in keywords:
+        if kw.lower() in text.lower():
+            text = text.replace(kw, f"{Fore.RED}{kw}{Fore.CYAN}")
+            text = text.replace(kw.capitalize(), f"{Fore.RED}{kw.capitalize()}{Fore.CYAN}")
+    return text
 
 # Target subdomains enum
 def subreponse(domain):
     global proxies
-    
+
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+    KEYWORDS = [
+        'admin', 'api', 'file', 'intranet', 'pwd', 'pass',
+        'config', 'dev', 'test', 'staging', 'panel', 'secret',
+        'management', 'cms', 'user', 'private', 'server', 
+        'cloud', 'settings', 'control', 'portal', 
+        'ssh', 'ftp', 'database', 'internal', 'adminpanel',
+        'superadmin', 'console', 'access', 'system', 'account', 
+        'adminer', 'wordpress', 'cpanel', 'git', 'svn', 
+        'pma', 'phpmyadmin', 'login', 'password', 'root', 
+        'shell', 'vnc', 'docker', 'docker-compose', 'remote', 
+        'vault', 'repository', 'secure', 'ssl', 'auth', 
+        'manage', 'configurator', 'monitor', 'dashboard', 'adminaccess', 
+        'backend', 'frontdoor', 'support', 'helpdesk', 'cloudadmin',
+        'apiaccess', 'internal-api', 'sandbox', 'devops', 'ci-cd', 
+        'gitlab', 'jenkins', 'deployment', 'webhooks', 'cron', 
+        'backup', 'vpn', 'token', 'oauth', 'sso', 'loginportal',
+        '2fa', 'mfa', 'security', 'credentials', 'reset', 'radius',
+        'key', 'apikey', 'session', 'jwt', 'signin', 'recovery',
+        'logout', 'change-password', 'unlock', 'identity', 'idp',
+        'authenticator', 'authorization', 'authserver', 'auth-api'    
+    ]
+
+
+
+
+
+
+
+
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }    
@@ -1096,6 +1135,148 @@ def subreponse(domain):
         print("-" * 50)
         
         time.sleep(1)
+
+
+
+# Target subdomains enum
+def subreponse2(domain, api_key):
+    
+
+    
+    
+    print(f"{Fore.YELLOW}[!] Subdomains for {Fore.CYAN}{domain}")
+    with open(api_key, 'r') as f:
+        token = f.read().strip()
+        if token == '':
+            pass
+        else:    
+            print(f"{Fore.YELLOW}[!] Source : https://www.virustotal.com/")
+            
+            url = 'https://www.virustotal.com/vtapi/v2/domain/report'
+            params = {'apikey':token,'domain':domain}
+            try:
+                response = requests.get("https://www.virustotal.com/vtapi/v2/domain/report", params=params)
+                jdata = response.json()
+                domains = sorted(jdata['subdomains'])
+            except(KeyError):
+                print(f"{Fore.MAGENTA}[!] {Fore.GREEN}No subdomains found for {Fore.YELLOW}{domain}\n")
+                pass
+            except(requests.ConnectionError):
+                print(f"{Fore.RED}[!] Rate limit error")
+                pass
+
+            for domainz in domains:
+
+                #print(f"{Fore.GREEN}[+] {Fore.CYAN}{domainz}")
+                highlighted = highlight_keywords(domainz, KEYWORDS)
+                print(f"{Fore.GREEN}[+] {Fore.CYAN}{highlighted}")
+            print("")
+    
+    print(f"{Fore.YELLOW}[!] Source : https://crt.sh/")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }    
+    
+    url = f"https://crt.sh/?q={domain}"
+    try:
+
+     
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"{M}[Error] {R}Request error to {url} : {e}")
+        return
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    
+    try:
+        table = soup.find_all('table')[1] 
+        rows = table.find_all('tr')[1:]  
+    except IndexError:
+        print(f"{M}[Error] {R}No valid data found on {url}")
+        return    
+
+    certificates = {}
+    for row in rows:
+        cols = row.find_all('td')
+        if len(cols) >= 6:
+            cert_id = cols[0].text.strip()
+            logged_at = cols[1].text.strip()
+            not_before = cols[2].text.strip()
+            not_after = cols[3].text.strip()
+            common_name = cols[4].text.strip()
+
+            if common_name not in certificates or logged_at > certificates[common_name]['logged_at']:
+                certificates[common_name] = {
+                    "cert_id": cert_id,
+                    "logged_at": logged_at,
+                    "not_before": not_before,
+                    "not_after": not_after,
+                    "common_name": common_name
+                }
+
+    if not certificates:
+        print(f"{Fore.MAGENTA}[!] {Fore.GREEN}No subdomains found for {Fore.YELLOW}{domain}")
+        return
+
+    print("-" * 50)
+    
+    for cert in certificates.values():
+        test_url = f"http://{cert['common_name']}"  # HTTP default     
+        statuscode = "N/A"  # init statuscode
+        try:
+            test_response = requests.get(test_url, headers=headers, timeout=5)
+            status = test_response.status_code
+            statuscode = test_response.status_code
+            
+            if status == 403 or status == 200:
+                if detect_login_page(test_response.text):
+                    status = f"login page [{Fore.RED}{statuscode}{Fore.GREEN}]"            
+            
+        except requests.exceptions.Timeout as e:
+            status = f"Timedout [{Fore.RED}{statuscode}{Fore.GREEN}]"
+
+            test_url = "/"
+        except requests.exceptions.ConnectionError as e:
+            if "getaddrinfo failed" in str(e):
+                status = f"DNS resolution failed [{Fore.RED}{statuscode}{Fore.GREEN}]"
+
+            else:
+                status = f"Connection error [{Fore.RED}{statuscode}{Fore.GREEN}]"
+
+            test_url = "/"
+        except requests.exceptions.RequestException as e:
+            status = f"Unexpected error [{Fore.RED}{statuscode}{Fore.GREEN}]"
+
+            test_url = "/"
+            
+        #print(f"{Fore.GREEN}[+] {Fore.YELLOW}Common Name    : {Fore.CYAN}{cert['common_name']}")
+        highlighted_cn = highlight_keywords(cert['common_name'], KEYWORDS)
+        print(f"{Fore.GREEN}[+] {Fore.YELLOW}Common Name    : {Fore.CYAN}{highlighted_cn}")
+        print(f"{Fore.GREEN}[+] {Fore.YELLOW}Logged At      : {Fore.GREEN}{cert['logged_at']}")
+        print(f"{Fore.GREEN}[+] {Fore.YELLOW}More Infos     : {Fore.GREEN}https://crt.sh/?id={cert['cert_id']}{Fore.YELLOW}")
+        print(f"{Fore.GREEN}[+] {Fore.YELLOW}Satus          : {Fore.GREEN}{status}{Fore.YELLOW}")
+        
+
+        print(f"{Fore.GREEN}[+] {Fore.YELLOW}Direct URL     : {Fore.GREEN}{test_url}{Fore.YELLOW}")
+        print("-" * 50)
+        
+        time.sleep(0.5)
+        
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ###############################################################################################################
@@ -1332,6 +1513,30 @@ def detect_plugins_and_themes(soup, raw_html=None):
                 if not any(slug in entry and kind_tag in entry for entry in plugins_or_themes):
                     plugins_or_themes.add(f"{M}{kind_tag} {Y}[{slug} {R}Version_not_found{Y}]")
 
+
+
+        generator_pattern = re.compile(
+            r'<meta\s+name=["\']generator["\']\s+content=["\']([^"\']+)["\']',
+            re.IGNORECASE
+        )
+
+        for meta_match in generator_pattern.finditer(raw_html):
+            content = meta_match.group(1).strip()
+            if 'All in One SEO' in content:
+                match = re.search(r'All in One SEO.*?(\d+\.\d+\.\d+)', content)
+                version = match.group(1) if match else "Version_not_found"
+                plugins_or_themes.add(f"{M}[plugin] {Y}[all-in-one-seo-pack {R}{version}{Y}]")
+            elif 'Site Kit by Google' in content:
+                match = re.search(r'Site Kit by Google.*?(\d+\.\d+\.\d+)', content)
+                version = match.group(1) if match else "Version_not_found"
+                plugins_or_themes.add(f"{M}[plugin] {Y}[google-site-kit {R}{version}{Y}]")
+
+
+
+
+
+
+
     return sorted(plugins_or_themes)
 
 
@@ -1422,7 +1627,7 @@ def display_results(result):
     if unique_items:
         vulns_path = "payloads/wp_vulns.json"
         if not os.path.isfile(vulns_path) or (time.time() - os.path.getmtime(vulns_path)) > 86400:
-            print(f"{G}   - [i] wp_vulns.json is missing or outdated. Downloading a fresh copy...")
+            print(f"{G}  - [i] wp_vulns.json is missing or outdated. Downloading a fresh copy...")
             try:
                 response = requests.get("https://www.wordfence.com/api/intelligence/v2/vulnerabilities/production", timeout=10)
                 response.raise_for_status()
@@ -1467,7 +1672,7 @@ def display_results(result):
             except InvalidVersion:
                 max_length = 80
                 short_range = version_range[:max_length] + "..." if len(version_range) > max_length else version_range
-                print(f"{C} | {R}[Error_info] {G}Invalid version detected (may be a false positive)\n{C} | {Y} --> {short_range}")
+                print(f"{C} |  {R}[Error_info] {G}Invalid version detected (may be a false positive)\n{C} | {Y} --> {short_range}")
                 return False
 
             for version_range in affected_versions.values():
@@ -1483,7 +1688,7 @@ def display_results(result):
                 except InvalidVersion:
                     max_length = 80
                     short_range = version_range[:max_length] + "..." if len(version_range) > max_length else version_range
-                    print(f"{C} | {R}[Error_info] {G}Invalid range version detected (may be a false positive)\n{C} |{Y} --> {short_range}")
+                    print(f"{C} |  {R}[Error_info] {G}Invalid range version detected (may be a false positive)\n{C} |{Y} --> {short_range}")
                     continue
 
                 from_ok = (current_version >= from_v) if from_v else True
@@ -1692,8 +1897,9 @@ def test_path_traversal(url, payload, cookies):
         if response.status_code == 200:
             # Check if the response contains a sensitive keyword (ex : contents of etc/passwd)
             if response_text != control_text:
-                if any(keyword in response_text for keyword in sensitive_keywords):
-                    print(f"{G}[+] {Y}{keyword} {G}detected for : {C}{target_url}")
+                found_keywords = [keyword for keyword in sensitive_keywords if keyword in response_text]
+                if found_keywords:
+                    print(f"{G}[+] {Y}{', '.join(found_keywords)} {G}detected for : {C}{target_url}")
                     print(f"{G}[+] Potential path traversal detected {Y}[{G}diff : {R}{len(response_text) - len(control_text)} bytes{Y}]")
                 else:
                     print(f"{G}[+] {C}{target_url}")
@@ -2025,7 +2231,7 @@ def audit_page(url, cookies):
         middleware_headers = {
             "serveurs": ["Server", "X-AspNet-Version", "X-Powered-By", "X-AspNetMvc-Version", "X-Runtime", "X-Python-Version"],
             "cms/frameworks": ["X-Generator", "X-Pingback", "X-Drupal-Cache"],
-            "cdn/waf": ["CF-RAY", "CF-Cache-Status", "X-Amz-Cf-Id", "X-Amzn-Trace-Id", "X-Akamai-", "X-Fastly-", "X-CDN"],
+            "cdn/waf": ["CF-RAY", "CF-Cache-Status", "X-Amz-Cf-Id", "X-Amzn-Trace-Id", "X-Akamai-", "X-Fastly-", "X-CDN", "X-WS-RateLimit-Limit", "X-WS-RateLimit-Remaining"],
             "proxies/load_balancers": ["Via", "X-Forwarded-For", "X-Real-IP", "X-Served-By", "X-Cache", "X-Backend-Server", "X-Proxy-Cache", "x-middleware-subrequest"]
         }
 
@@ -2209,7 +2415,590 @@ def basicChecks(response, url):
         print(f"{M}[+] {G}Payload : {Y}{payloads[0]} {G}used on {C}{url}")
 
 
+###############################################################################################################
+################################################# Vuln_checker ################################################
+###############################################################################################################
+def wappalyze_that(url, cookies):
+# With options
+    results = analyze(
+        url=url,
+        scan_type='full',  # 'fast', 'balanced', or 'full'
+        threads=3,
+        cookie=cookies
+    )
+    return results
+    
 
+def is_there_a_vuln(versions, url_target):
+    def nextjs(versions):
+        def is_vulnerable_nextjs(v):
+            parsed = version.parse(v)
+            for lower, upper in vulnerable_ranges_nextjs:
+                if lower <= parsed < upper:
+                    return True
+            return False
+            
+        vulnerable_ranges_nextjs = [
+            (version.parse("13.0.0"), version.parse("13.5.9")),
+            (version.parse("14.0.0"), version.parse("14.2.25")),
+            (version.parse("15.0.0"), version.parse("15.2.3")),
+            (version.parse("11.1.4"), version.parse("12.3.5")),
+        ]
+        
+        print(f"{G}[+] Checking Next.js middleware")
+        for url, technologies in versions.items():
+            for tech_name, tech_data in technologies.items():
+                if tech_name.lower() == "next.js":
+                    detected_version = tech_data.get("version", "")
+                    if detected_version:
+                        if is_vulnerable_nextjs(detected_version):
+                            print(f"    {R}[!] Vulnerable Next.js version detected : {detected_version}")
+                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: pages/_middleware")
+                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: middleware")
+                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: src/middleware")
+                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: middleware:middleware:middleware:middleware:middleware")
+                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: src/middleware:src/middleware:src/middleware:src/middleware:src/middleware")
+                    else:
+                        print(f"    {M}[-] Next.js detected, but version not detected")
+
+
+    def drupal(versions):
+        def is_vulnerable_drupal(v):
+            parsed = version.parse(v)
+            for lower, upper in vulnerable_ranges_drupal:
+                if lower <= parsed < upper:
+                    return True
+            return False
+
+        vulnerable_ranges_drupal = [
+            (version.parse("7.0"), version.parse("7.58")),
+            (version.parse("8.0.0"), version.parse("8.3.9")),
+            (version.parse("8.4.0"), version.parse("8.4.6")),
+            (version.parse("8.5.0"), version.parse("8.5.1")),
+        ]
+
+        print(f"{G}[+] Checking Drupal versions")
+        for url, technologies in versions.items():
+            for tech_name, tech_data in technologies.items():
+                if tech_name.lower() == "drupal":
+                    detected_version = tech_data.get("version", "")
+                    if detected_version:
+                        if is_vulnerable_drupal(detected_version):
+                            print(f"    {R}[!] Vulnerable Drupal version detected : {detected_version}")
+                            print(f"    {C}[*] --> {Y}Exploitable via CVE-2018-7600 (Drupalgeddon 2)")
+                            print(f"    {C}[*] --> {Y}Unauthenticated RCE possible")
+                    else:
+                        print(f"    {M}[-] Drupal detected, but version not detected")
+
+
+    def struts2(versions):
+        def is_vulnerable_struts(v):
+            parsed = version.parse(v)
+            for lower, upper in vulnerable_ranges_struts:
+                if lower <= parsed < upper:
+                    return True
+            return False
+
+        vulnerable_ranges_struts = [
+            (version.parse("2.3.0"), version.parse("2.3.32")),
+            (version.parse("2.5.0"), version.parse("2.5.10.1")),
+        ]
+
+        print(f"{G}[+] Checking Apache Struts 2 versions")
+        for url, technologies in versions.items():
+            for tech_name, tech_data in technologies.items():
+                if tech_name.lower() == "apache struts" or tech_name.lower() == "struts2":
+                    detected_version = tech_data.get("version", "")
+                    if detected_version:
+                        if is_vulnerable_struts(detected_version):
+                            print(f"    {R}[!] Vulnerable Apache Struts 2 version detected : {detected_version}")
+                            print(f"    {C}[*] --> {Y}Exploitable via CVE-2017-5638")
+                            print(f"    {C}[*] --> {Y}Remote Code Execution via crafted HTTP headers (Content-Type, Content-Disposition, Content-Length)")
+
+                    else:
+                        print(f"    {M}[-] Apache Struts detected, but version not detected")
+
+
+
+
+
+    def php(versions):
+        def is_vulnerable_php(v):
+            parsed = version.parse(v)
+            vulnerable_ranges_php = [
+                (version.parse("5.0.0"), version.parse("5.4.45")),  # End support PHP 5.4
+                (version.parse("5.5.0"), version.parse("5.6.40")),  # End support PHP 5.6
+                (version.parse("7.0.0"), version.parse("7.4.28")),  # End support PHP 7.4
+            ]
+            for lower, upper in vulnerable_ranges_php:
+                if lower <= parsed <= upper:
+                    return True
+            return False
+
+        print(f"{G}[+] Checking PHP versions")
+        for url, technologies in versions.items():
+            for tech_name, tech_data in technologies.items():
+                if tech_name.lower() == "php":
+                    detected_version = tech_data.get("version", "")
+                    if detected_version:
+                        if is_vulnerable_php(detected_version):
+                            print(f"    {R}[!] Vulnerable PHP version detected : {detected_version}")
+                    else:
+                        print(f"    {M}[-] PHP detected, but version not detected")
+
+
+    def check_headers(url_target):
+        WARN_X_FRAME = "[!] X-Frame-Options isn't set to '{}' or 'DENY'"
+        WARN_CSP_FRAME_ANCESTORS = "[!] CSP doesn't include a 'frame-ancestors' directive"
+
+        print(f"{G}[+] Checking headers misconfigurations")
+
+        try:
+            response = requests.head(url_target, timeout=10, allow_redirects=True)
+            headers = response.headers
+
+            x_frame_options = headers.get("X-Frame-Options")
+            content_security_policy = headers.get("Content-Security-Policy")
+
+
+            if x_frame_options is None:
+                print(f"    {R}[!] X-Frame-Options header is missing")
+            else:
+                x_frame_lower = x_frame_options.lower()
+                if "deny" not in x_frame_lower and "sameorigin" not in x_frame_lower:
+                    print(f"{R}    " + WARN_X_FRAME.format("DENY or SAMEORIGIN"))
+
+            if content_security_policy is None:
+                print(f"{R}    [!] Content-Security-Policy header is missing")
+            else:
+                if "frame-ancestors" not in content_security_policy.lower():
+                    print(f"{R}    " + WARN_CSP_FRAME_ANCESTORS)
+
+        except requests.RequestException as e:
+            pass
+            
+
+    def is_same_domain(url1, url2):
+        return urlparse(url1).netloc == urlparse(url2).netloc
+
+
+    def test_sql_injection_reflected(url_target):
+        sql_errors = [
+            # MySQL / MariaDB
+            "you have an error in your sql syntax",
+            "warning: mysql_",
+            "mysql_fetch_array()",
+            "mysql_fetch_assoc()",
+            "mysql_num_rows()",
+            "mysqli_fetch_array()",
+            "mysqli_fetch_assoc()",
+            "call to undefined function mysql_",
+            "unknown column",
+            "column count doesn't match",
+            "duplicate entry",
+            "incorrect integer value",
+            "truncated incorrect",
+            "supplied argument is not a valid mysql",
+            "cannot execute queries while other unbuffered queries",
+            "commands out of sync",
+            "invalid use of group function",
+
+            # PostgreSQL
+            "pg_query()",
+            "pg_exec()",
+            "pg_fetch_array()",
+            "pg_fetch_assoc()",
+            "pg_num_rows()",
+            "unterminated quoted string",
+            "syntax error at or near",
+            "pg_query(): query failed",
+            "invalid input syntax for",
+            "fatal: role",
+            "fatal: database",
+            "permission denied for",
+            "relation does not exist",
+            "invalid byte sequence for encoding",
+            "more than one row returned by a subquery used as an expression",
+
+            # SQLite
+            "sqlite3.*exception",
+            "sqliteexception",
+            "unrecognized token",
+            "near \"",
+            "no such table",
+            "no such column",
+            "sqlite error",
+            "unterminated string",
+            "attempt to write a readonly database",
+            "database is locked",
+
+            # Microsoft SQL Server (MSSQL)
+            "microsoft odbc sql server driver",
+            "sql server native client",
+            "mssql_query()",
+            "odbc_exec()",
+            "incorrect syntax near",
+            "unclosed quotation mark after the character string",
+            "invalid column name",
+            "ambiguous column name",
+            "procedure or function expects parameter",
+            "must declare the scalar variable",
+            "conversion failed when converting",
+            "the multi-part identifier could not be bound",
+            "object name is invalid",
+            "sql error: incorrect syntax",
+
+            # Oracle
+            "ora-00933",  # SQL command not properly ended
+            "ora-00936",  # missing expression
+            "ora-00904",  # invalid identifier
+            "ora-01756",  # quoted string not properly terminated
+            "ora-00921",  # unexpected end of SQL command
+            "ora-06550",  # PL/SQL: syntax error
+            "oracle error",
+            "pl/sql: statement ignored",
+            "invalid relational operator",
+
+            # Génériques / Frameworks / Divers
+            "sql syntax error",
+            "quoted string not properly terminated",
+            "unclosed quotation mark",
+            "syntax error",
+            "unexpected end of sql command",
+            "sqlstate",
+            "database error",
+            "fatal error",
+            "exception while preparing query",
+            "error executing query",
+            "odbc sql error",
+            "query failed",
+            "failed to execute query",
+            "pdoexception",
+            "syntaxerrorexception",
+            "java.sql.sqlexception",
+            "invalid query",
+            "invalid parameter number",
+        ]
+
+        base_domain = urlparse(url_target).netloc
+
+        print(f"{G}[+] Searching for reflected parameters and testing basic quote SQL injection")
+        try:
+            resp = requests.get(url_target, timeout=10)
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            links = soup.find_all("a", href=True)
+            already_tested_keys = set()
+
+            for link in links:
+                href = urljoin(url_target, link['href'])
+                if not is_same_domain(href, url_target):
+                    continue  # Ignore liens hors domaine
+
+                parsed = urlparse(href)
+                if not parsed.query:
+                    continue
+
+                path = parsed.path
+                params = parse_qs(parsed.query)
+
+                for param in params:
+                    key = (path, param)
+                    if key in already_tested_keys:
+                        continue  
+
+                    modified_params = params.copy()
+                    modified_params[param] = [v + "'" for v in modified_params[param]]
+
+                    new_query = urlencode(modified_params, doseq=True)
+                    injected_url = urlunparse(parsed._replace(query=new_query))
+                    full_url = urljoin(url_target, injected_url)
+
+                    if not is_same_domain(full_url, url_target):
+                        continue  # Ignore redirections hors domaine
+
+                    try:
+                        r = requests.get(full_url, timeout=10, allow_redirects=True)
+                        page_content = r.text.lower()
+                        #print(full_url) # Debug mode 
+                        if any(err in page_content for err in sql_errors):
+                            print(f"{R}    [!] Possible SQLi in param '{param}' (SQL error string detected)")
+                            print(f"{C}    [*] {Y}{full_url}")
+                            continue
+
+                        already_tested_keys.add(key)
+
+                        for step in r.history + [r]:
+                            if step.status_code >= 500:
+                                # On vérifie aussi domaine pour chaque étape historique
+                                if is_same_domain(step.url, url_target):
+                                    print(f"{R}    [!] Server error ({step.status_code}) possible injection or crash in param '{param}'")
+                                    print(f"{C}    [*] {Y}{full_url}")
+                                    break
+
+                    except requests.RequestException:
+                        continue
+
+        except requests.RequestException:
+            pass
+
+
+    def is_potentially_exploitable(payload, html):
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Check raw presence
+        if payload in html:
+            return True, "Reflected raw"
+
+        # Check if appears in script tag
+        for script in soup.find_all("script"):
+            if payload in script.text:
+                return True, "Inside <script>"
+
+        # Check in attributes
+        for tag in soup.find_all(True):
+            for attr_val in tag.attrs.values():
+                if isinstance(attr_val, list):
+                    if any(payload in val for val in attr_val):
+                        return True, "In attribute list"
+                elif payload in str(attr_val):
+                    return True, f"In attribute: {tag.name}"
+
+        return False, None
+
+
+    def test_reflected_xss(url_target):
+        xss_payload = "<XSS123>"
+        base_domain = urlparse(url_target).netloc
+
+        print(f"{G}[+] Searching for reflected parameters and testing basic XSS injection")
+
+        try:
+            resp = requests.get(url_target, timeout=10)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            links = soup.find_all("a", href=True)
+            already_tested_keys = set()
+
+            for link in links:
+                href = urljoin(url_target, link['href'])
+                if not is_same_domain(href, url_target):
+                    continue  # Ignore liens hors domaine
+
+                parsed = urlparse(href)
+                if not parsed.query:
+                    continue
+
+                path = parsed.path
+                params = parse_qs(parsed.query)
+
+                for param in params:
+                    key = (path, param)
+                    if key in already_tested_keys:
+                        continue
+
+                    modified_params = params.copy()
+                    modified_params[param] = [xss_payload]
+                    new_query = urlencode(modified_params, doseq=True)
+                    injected_url = urlunparse(parsed._replace(query=new_query))
+                    full_url = urljoin(url_target, injected_url)
+
+                    if not is_same_domain(full_url, url_target):
+                        continue  # Ignore redirections hors domaine
+
+                    try:
+                        r = requests.get(full_url, timeout=10, allow_redirects=True)
+
+                        # Vérifie dans tout l'historique de redirection HTTP
+                        for step in r.history + [r]:
+                            if not is_same_domain(step.url, url_target):
+                                continue
+                            #print(full_url) # Debug mode 
+                            exploitable, context = is_potentially_exploitable(xss_payload, step.text)
+                            if exploitable:
+                                print(f"{R}    [!] Possible reflected XSS : param '{param}' ({context})")
+                                print(f"{C}    [*] {Y}{step.url}")
+                                break
+                        else:
+                            soup_r = BeautifulSoup(r.text, "html.parser")
+                            meta = soup_r.find("meta", attrs={"http-equiv": "refresh"})
+                            if meta:
+                                content = meta.get("content", "")
+                                if "url=" in content.lower():
+                                    redirect_path = content.split("url=", 1)[-1].strip().strip("'\"")
+                                    redirect_url = urljoin(full_url, redirect_path)
+
+                                    if is_same_domain(redirect_url, url_target):
+                                        try:
+                                            redirected_response = requests.get(redirect_url, timeout=10, allow_redirects=True)
+                                            if xss_payload.lower() in redirected_response.text.lower():
+                                                print(f"{R}    [!] Possible reflected XSS : param '{param}' (payload reflected after meta redirect)")
+                                                print(f"{C}    [*] {Y}{redirect_url}")
+                                        except requests.RequestException:
+                                            pass
+
+                        already_tested_keys.add(key)
+
+                    except requests.RequestException:
+                        continue
+
+        except requests.RequestException:
+            pass
+
+
+    def test_php_backup_files(url_target):
+        print(f"{G}[+] Searching for PHP files and testing various backup file suffixes")
+
+        backup_suffixes = [
+            "~",
+            ".bak",
+            ".old",
+            ".orig",
+            ".save",
+            ".php.bak",
+            ".php.orig",
+            ".php.save",
+        ]
+
+        try:
+            resp = requests.get(url_target, timeout=10, allow_redirects=False)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+        except requests.RequestException as e:
+            return
+
+        php_files = set()
+        tags_attrs = {
+            "a": "href",
+            "link": "href",
+            "script": "src",
+            "iframe": "src",
+            "img": "src",
+            "form": "action",
+        }
+
+        for tag, attr in tags_attrs.items():
+            for element in soup.find_all(tag):
+                val = element.get(attr)
+                if val and ".php" in val.lower():
+                    full_url = urljoin(url_target, val)
+                    parsed = urlparse(full_url)
+                    url_no_params = parsed._replace(query="", fragment="")
+
+                    if not url_no_params.path.endswith(".php"):
+                        continue
+
+                    for suffix in backup_suffixes:
+                        new_path = url_no_params.path + suffix
+
+                        backup_url = urlunparse((
+                            url_no_params.scheme,
+                            url_no_params.netloc,
+                            new_path,
+                            url_no_params.params,
+                            "",
+                            ""
+                        ))
+
+                        php_files.add(backup_url)
+
+        for backup_url in php_files:
+            try:
+                r = requests.get(backup_url, timeout=10, allow_redirects=False)
+                if r.status_code == 200:
+                    print(f"{R}    [!] Backup file accessible")
+                    print(f"{C}    [*] {Y}{backup_url}")
+            except requests.RequestException:
+                pass
+
+    def test_sensitive_files(url_target):
+        sensitive_files = [
+            ".env",
+            "config.php",
+            "phpinfo.php",
+            ".htaccess",
+            ".htpasswd",
+            "settings.py",
+            "config.json",
+            "config.yaml",
+            "database.sql",
+            "dump.sql",
+            "backup.zip",
+            "backup.tar.gz",
+            "error.log",
+            ".git/config",
+        ]
+
+        parsed = urlparse(url_target)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        print(f"{G}[+] Testing sensitive files from {base_url}")
+
+        for file_path in sensitive_files:
+            url = base_url.rstrip('/') + '/' + file_path
+            try:
+                resp = requests.get(url, timeout=10, allow_redirects=False)
+                if resp.status_code == 200:
+                    content_type = resp.headers.get('Content-Type', '')
+                    if any(ct in content_type for ct in ['text', 'json', 'xml']):
+                        print(f"{R}    [!] Sensitive file accessible")
+                        print(f"{C}    [*] {Y}{url}")
+                    else:
+                        print(f"{R}    [!] Sensitive file (non text) accessible (Content-Type : {content_type})")
+                        print(f"{C}    [*] {Y}{url}")
+
+            except requests.RequestException as e:
+                pass
+
+
+
+    nextjs(versions)
+    drupal(versions)
+    struts2(versions)
+    php(versions)
+    check_headers(url_target)
+    test_sql_injection_reflected(url_target)
+    test_reflected_xss(url_target)
+    test_php_backup_files(url_target)
+    test_sensitive_files(url_target)
+
+
+
+###############################################################################################################
+################################################## github dorks ###############################################
+###############################################################################################################
+def read_github_token(filepath="tokens/github.txt"):
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Token file not found: {filepath}")
+    with open(filepath, "r") as f:
+        token = f.read().strip()
+    return token
+
+def search_github_code(query, token, per_page=10):
+    url = "https://api.github.com/search/code"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    params = {
+        "q": query,
+        "per_page": per_page,
+    }
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+    return response.json()
+
+def get_file_content(repo_full_name, file_path, token):
+    url = f"https://api.github.com/repos/{repo_full_name}/contents/{file_path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+    
+def decode_content(encoded_content):
+    return base64.b64decode(encoded_content).decode('utf-8')
+    
 
 ###############################################################################################################
 ################################################### main menu #################################################
@@ -2248,6 +3037,8 @@ def main():
     parser.add_argument("-op", '--open-redirect', action="store_true", help=f"Try to exploit path open redirect. Payloads into payloads/open_redirect.txt")
     parser.add_argument("-cr", '--crlf', action="store_true", help=f"Try to exploit crlf injection. Payloads into payloads/crlf.txt")
     parser.add_argument("-i", '--infos', action="store_true", help=f"Check basics webpage infos (headers, vulnerable source or sinks, Click-Hijacking, ...)")
+    parser.add_argument("--vuln", action="store_true", help=f"Check somme vulns in passive mode (next.js middleware)")
+    parser.add_argument("--github", help="Extract GitHub dork search queries paired with AI-generated prompts for analysis")
     parser.add_argument("--dalfox", action="store_true", help="Use dalfox")
     parser.add_argument("--sqlmap", action="store_true", help="Use sqlmap")
     parser.add_argument("--nuclei", action="store_true", help="Use nuclei")
@@ -2278,7 +3069,36 @@ def main():
 
 
     if not (args.url or args.file):
-        parser.error("You must specify at least one of the arguments: --url or --file")
+        if args.github:
+            token = read_github_token()
+
+            query = args.github
+
+            results = search_github_code(query, token)
+            items = results.get("items", [])
+
+            for item in items:
+                repo = item["repository"]["full_name"]
+                path = item["path"]
+                html_url = item["html_url"]
+                print(f"\n---\nFile: {repo}/{path}\nURL: {html_url}")
+
+                # Afficher les extraits textuels retournés par l'API
+                text_matches = item.get("text_matches", [])
+                if text_matches:
+                    for match in text_matches:
+                        fragment = match.get("fragment", "")
+                        print(f"\nExcerpt:\n{fragment}\n{'-'*40}")
+                else:
+                    # Si pas de fragment, afficher les 20 premières lignes par défaut
+                    file_data = get_file_content(repo, path, token)
+                    content = decode_content(file_data["content"])
+                    lines = content.splitlines()
+                    snippet = "\n".join(lines[:20])
+                    print(f"Extrait du fichier (20 premières lignes):\n{snippet}")
+        
+        else:    
+            parser.error("You must specify your search query")
 
     if args.url and args.file:
         parser.error("You cannot specify both --url and --file at the same time")
@@ -2751,6 +3571,48 @@ def main():
                 print(f"{M}[-] Not found : {Y}{robots_url}")
         except Exception as e:
             print(f"[Error] {e}")
+
+        
+        # Wappalyzer
+        if not args.url.startswith(('http://', 'https://')):
+            args.url = 'https://' + args.url
+        
+        print(f"\n{M}[Info] {C}Wappalyzer analysis")    
+        versions = wappalyze_that(args.url, cookies)
+        for url, techs in versions.items():
+            if not techs:
+                print(f"{M}[-] No technologies found")
+                continue
+               
+            for tech_name, details in techs.items():
+                version = details.get("version", "")
+                confidence = details.get("confidence", 0)
+                categories = details.get("categories", [])
+                groups = details.get("groups", [])
+
+                if version and version != "":
+                    version_display = f"{R}{version}" # red color
+                else:
+                    version_display = f"{Y}/"
+
+                print(f"{M}[+] {G}Technology : {Y}{tech_name}")
+                print(f"    {G}Version    : {version_display}")
+                print(f"    {G}Confidence : {Y}{confidence}%")
+                print(f"    {G}Categories : {Y}{', '.join(categories) if categories else 'none'}")
+                print(f"    {G}Groups     : {Y}{', '.join(groups) if groups else 'none'}")
+                print("")
+                    
+        
+
+    if args.vuln:
+        # Wappalyzer
+        if not args.url.startswith(('http://', 'https://')):
+            args.url = 'https://' + args.url
+        
+        print(f"\n{M}[Info] {C}Checking for vulnerable versions")    
+        versions = wappalyze_that(args.url, cookies)
+        is_there_a_vuln(versions, args.url)
+
 
 
     if args.wtf:
