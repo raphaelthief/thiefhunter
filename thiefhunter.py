@@ -2422,129 +2422,186 @@ def wappalyze_that(url, cookies):
 # With options
     results = analyze(
         url=url,
-        scan_type='full',  # 'fast', 'balanced', or 'full'
+        scan_type='balanced',  # 'fast', 'balanced', or 'full'
         threads=3,
         cookie=cookies
     )
+    print_technos_detected(results)
     return results
     
 
+def print_technos_detected(technos_dict):
+    print(f"{G}[+] Detected technologies (Wappalyzer analysis)")
+    for url, technologies in technos_dict.items():
+        for tech_name, tech_info in technologies.items():
+            version = tech_info.get("version", "") or "N/A"
+            confidence = tech_info.get("confidence", 0)
+            categories = ", ".join(tech_info.get("categories", []))
+            Groups = ", ".join(tech_info.get("groups", []))
+            version_display = f"{R}{version}" if version else f"{Y}N/A"
+            print(f"    📌 {C}{tech_name}")
+            print(f"       {C}↳ {G}Version    : {Y}{version_display}")
+            print(f"       {C}↳ {G}Confidence : {Y}{confidence}%")
+            print(f"       {C}↳ {G}Categories : {Y}{categories}")
+            print(f"       {C}↳ {G}Groups     : {Y}{Groups}")
+    print("")
+
+
 def is_there_a_vuln(versions, url_target):
-    def nextjs(versions):
-        def is_vulnerable_nextjs(v):
-            parsed = version.parse(v)
-            for lower, upper in vulnerable_ranges_nextjs:
-                if lower <= parsed < upper:
-                    return True
-            return False
-            
-        vulnerable_ranges_nextjs = [
-            (version.parse("13.0.0"), version.parse("13.5.9")),
-            (version.parse("14.0.0"), version.parse("14.2.25")),
-            (version.parse("15.0.0"), version.parse("15.2.3")),
-            (version.parse("11.1.4"), version.parse("12.3.5")),
-        ]
-        
-        print(f"{G}[+] Checking Next.js middleware")
-        for url, technologies in versions.items():
-            for tech_name, tech_data in technologies.items():
-                if tech_name.lower() == "next.js":
-                    detected_version = tech_data.get("version", "")
-                    if detected_version:
-                        if is_vulnerable_nextjs(detected_version):
-                            print(f"    {R}[!] Vulnerable Next.js version detected : {detected_version}")
-                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: pages/_middleware")
-                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: middleware")
-                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: src/middleware")
-                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: middleware:middleware:middleware:middleware:middleware")
-                            print(f"    {C}[*] --> {Y}x-middleware-subrequest: src/middleware:src/middleware:src/middleware:src/middleware:src/middleware")
-                    else:
-                        print(f"    {M}[-] Next.js detected, but version not detected")
-
-
-    def drupal(versions):
-        def is_vulnerable_drupal(v):
-            parsed = version.parse(v)
-            for lower, upper in vulnerable_ranges_drupal:
-                if lower <= parsed < upper:
-                    return True
-            return False
-
-        vulnerable_ranges_drupal = [
-            (version.parse("7.0"), version.parse("7.58")),
-            (version.parse("8.0.0"), version.parse("8.3.9")),
-            (version.parse("8.4.0"), version.parse("8.4.6")),
-            (version.parse("8.5.0"), version.parse("8.5.1")),
+    def cve_nvd_search(versions):
+        wordpress_keywords = [
+            "wordpress", "contact form 7", "woocommerce", "yoast seo", "jetpack", "akismet",
+            "google tag manager for wordpress", "wpforms", "elementor", "w3 total cache",
+            "all in one seo", "google analytics for wordpress", "classic editor",
+            "really simple ssl", "wordfence", "tablepress", "updraftplus", "contact form",
+            "gravity forms", "revslider", "wp rocket", "bbpress", "buddyPress", "wp super cache",
+            "google analytics dashboard for wp", "wp mail smtp", "slider revolution",
+            "contact form 7", "wordpress seo", "wpml", "wp job manager"
         ]
 
-        print(f"{G}[+] Checking Drupal versions")
+
+        def get_cpe_for_product(product_name, version):
+            base_url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+            params = {
+                "keywordSearch": product_name,
+                "resultsPerPage": 200,
+            }
+            response = requests.get(base_url, params=params)
+            if response.status_code != 200:
+                print(f"    {R}[-] API error for {product_name} : {response.status_code}")
+                return None
+
+            data = response.json()
+            cpes_found = []
+
+            for item in data.get("vulnerabilities", []):
+                configurations = item.get("cve", {}).get("configurations", [])
+                for config in configurations:
+                    nodes = config.get("nodes", [])
+                    for node in nodes:
+                        cpe_matches = node.get("cpeMatch", [])
+                        for cpe_match in cpe_matches:
+                            cpe23uri = cpe_match.get("criteria")
+                            if cpe23uri and cpe23uri.startswith("cpe:2.3:a:"):
+                                cpes_found.append(cpe23uri)
+
+            for cpe in cpes_found:
+                parts = cpe.split(":")
+                if len(parts) >= 5:
+                    vendor = parts[3]
+                    product = parts[4]
+                    pname = product_name.lower().replace(" ", "")
+                    if pname in vendor or pname in product:
+                        new_parts = parts[:]
+                        new_parts[5] = version
+                        for i in range(6, len(new_parts)):
+                            new_parts[i] = "*"
+                        new_cpe = ":".join(new_parts)
+                        return new_cpe
+
+            if cpes_found:
+                parts = cpes_found[0].split(":")
+                new_parts = parts[:]
+                new_parts[5] = version
+                for i in range(6, len(new_parts)):
+                    new_parts[i] = "*"
+                return ":".join(new_parts)
+
+            return None
+
+
+        def get_cves_for_cpe(cpe):
+            base_url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+            params = {
+                "cpeName": cpe,
+                "resultsPerPage": 200,
+            }
+            response = requests.get(base_url, params=params)
+            if response.status_code != 200:
+                print(f"    {R}[-] API error searching CVEs : {response.status_code}")
+                return []
+
+            data = response.json()
+            cve_list = []
+            for item in data.get("vulnerabilities", []):
+                cve_id = item.get("cve", {}).get("id")
+                description_data = item.get("cve", {}).get("descriptions", [])
+                description = ""
+                for desc in description_data:
+                    if desc.get("lang") == "en":
+                        description = desc.get("value")
+                        break
+
+                # Extract CVSS v3.1 or v3.0 severity
+                severity = "N/A"
+                score = "N/A"
+                metrics = item.get("cve", {}).get("metrics", {})
+                if "cvssMetricV31" in metrics:
+                    cvss_data = metrics["cvssMetricV31"][0]["cvssData"]
+                    severity = cvss_data.get("baseSeverity", "N/A")
+                    score = cvss_data.get("baseScore", "N/A")
+                elif "cvssMetricV30" in metrics:
+                    cvss_data = metrics["cvssMetricV30"][0]["cvssData"]
+                    severity = cvss_data.get("baseSeverity", "N/A")
+                    score = cvss_data.get("baseScore", "N/A")
+                elif "cvssMetricV2" in metrics:
+                    cvss_data = metrics["cvssMetricV2"][0]["cvssData"]
+                    severity = cvss_data.get("baseSeverity", "N/A")
+                    score = cvss_data.get("baseScore", "N/A")
+
+                cve_list.append((cve_id, description, severity, score))
+            return cve_list
+
+
+
+        def fetch_cve_data(cve_id):
+            url = f"https://poc-in-github.motikan2010.net/api/v1/?cve_id={cve_id}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"     {R}→ Failed to fetch data for {cve_id} : {response.status_code}{Fore.YELLOW}")
+                return None
+
+        def display_cve_data(cve_data):
+            if not cve_data or 'pocs' not in cve_data:
+                return
+          
+            for poc in cve_data['pocs']:
+                print(f"     {C}-----")
+                print(f"     {C}→ {Y}Exploit : {Y}{poc.get('name', 'N/A')}")
+                print(f"     {C}→ {Y}Stars   : {Y}{poc.get('stargazers_count', '0')}")
+                print(f"     {C}→ {Y}{poc.get('html_url', 'N/A')}")
+
         for url, technologies in versions.items():
             for tech_name, tech_data in technologies.items():
-                if tech_name.lower() == "drupal":
-                    detected_version = tech_data.get("version", "")
-                    if detected_version:
-                        if is_vulnerable_drupal(detected_version):
-                            print(f"    {R}[!] Vulnerable Drupal version detected : {detected_version}")
-                            print(f"    {C}[*] --> {Y}Exploitable via CVE-2018-7600 (Drupalgeddon 2)")
-                            print(f"    {C}[*] --> {Y}Unauthenticated RCE possible")
+                version = tech_data.get("version") if isinstance(tech_data, dict) else None
+                if version:
+                    print(f"{G}[+] Checking {tech_name} {version}")
+                    # Check if tech_name contains any WP keyword (case-insensitive)
+                    tech_name_lower = tech_name.lower()
+                    wp_detected = any(keyword in tech_name_lower for keyword in wordpress_keywords)
+                    if wp_detected:
+                        print(f"    {C}>>> {G}Potential WordPress detected try {Y}--wp {G}argument")
+
+                    cpe = get_cpe_for_product(tech_name, version)
+                        
+                    if cpe:
+                        print(f"    {C}[*] {G}CPE found  : {Y}{cpe}")
+                        cves = get_cves_for_cpe(cpe)
+                        print(f"    {C}[*] {G}CVEs found : {Y}{len(cves)}")
+                        for cve_id, desc, severity, score in cves:
+                            print(f"    {R}[!] {C}{cve_id} {R}[{severity} → {score}]")
+                            print(f"     {C}→ {Y}{desc[:100]}...")
+                            
+                            cve_data = fetch_cve_data(cve_id)
+                            display_cve_data(cve_data)
+                            #time.sleep(1.5)
+                            
+                            
                     else:
-                        print(f"    {M}[-] Drupal detected, but version not detected")
+                        print(f"    {M}[-] No CPE found ...")
 
-
-    def struts2(versions):
-        def is_vulnerable_struts(v):
-            parsed = version.parse(v)
-            for lower, upper in vulnerable_ranges_struts:
-                if lower <= parsed < upper:
-                    return True
-            return False
-
-        vulnerable_ranges_struts = [
-            (version.parse("2.3.0"), version.parse("2.3.32")),
-            (version.parse("2.5.0"), version.parse("2.5.10.1")),
-        ]
-
-        print(f"{G}[+] Checking Apache Struts 2 versions")
-        for url, technologies in versions.items():
-            for tech_name, tech_data in technologies.items():
-                if tech_name.lower() == "apache struts" or tech_name.lower() == "struts2":
-                    detected_version = tech_data.get("version", "")
-                    if detected_version:
-                        if is_vulnerable_struts(detected_version):
-                            print(f"    {R}[!] Vulnerable Apache Struts 2 version detected : {detected_version}")
-                            print(f"    {C}[*] --> {Y}Exploitable via CVE-2017-5638")
-                            print(f"    {C}[*] --> {Y}Remote Code Execution via crafted HTTP headers (Content-Type, Content-Disposition, Content-Length)")
-
-                    else:
-                        print(f"    {M}[-] Apache Struts detected, but version not detected")
-
-
-
-
-
-    def php(versions):
-        def is_vulnerable_php(v):
-            parsed = version.parse(v)
-            vulnerable_ranges_php = [
-                (version.parse("5.0.0"), version.parse("5.4.45")),  # End support PHP 5.4
-                (version.parse("5.5.0"), version.parse("5.6.40")),  # End support PHP 5.6
-                (version.parse("7.0.0"), version.parse("7.4.28")),  # End support PHP 7.4
-            ]
-            for lower, upper in vulnerable_ranges_php:
-                if lower <= parsed <= upper:
-                    return True
-            return False
-
-        print(f"{G}[+] Checking PHP versions")
-        for url, technologies in versions.items():
-            for tech_name, tech_data in technologies.items():
-                if tech_name.lower() == "php":
-                    detected_version = tech_data.get("version", "")
-                    if detected_version:
-                        if is_vulnerable_php(detected_version):
-                            print(f"    {R}[!] Vulnerable PHP version detected : {detected_version}")
-                    else:
-                        print(f"    {M}[-] PHP detected, but version not detected")
 
 
     def check_headers(url_target):
@@ -2693,7 +2750,7 @@ def is_there_a_vuln(versions, url_target):
             for link in links:
                 href = urljoin(url_target, link['href'])
                 if not is_same_domain(href, url_target):
-                    continue  # Ignore liens hors domaine
+                    continue  
 
                 parsed = urlparse(href)
                 if not parsed.query:
@@ -2715,7 +2772,7 @@ def is_there_a_vuln(versions, url_target):
                     full_url = urljoin(url_target, injected_url)
 
                     if not is_same_domain(full_url, url_target):
-                        continue  # Ignore redirections hors domaine
+                        continue  
 
                     try:
                         r = requests.get(full_url, timeout=10, allow_redirects=True)
@@ -2730,7 +2787,6 @@ def is_there_a_vuln(versions, url_target):
 
                         for step in r.history + [r]:
                             if step.status_code >= 500:
-                                # On vérifie aussi domaine pour chaque étape historique
                                 if is_same_domain(step.url, url_target):
                                     print(f"{R}    [!] Server error ({step.status_code}) possible injection or crash in param '{param}'")
                                     print(f"{C}    [*] {Y}{full_url}")
@@ -2782,7 +2838,7 @@ def is_there_a_vuln(versions, url_target):
             for link in links:
                 href = urljoin(url_target, link['href'])
                 if not is_same_domain(href, url_target):
-                    continue  # Ignore liens hors domaine
+                    continue 
 
                 parsed = urlparse(href)
                 if not parsed.query:
@@ -2803,12 +2859,11 @@ def is_there_a_vuln(versions, url_target):
                     full_url = urljoin(url_target, injected_url)
 
                     if not is_same_domain(full_url, url_target):
-                        continue  # Ignore redirections hors domaine
+                        continue  
 
                     try:
                         r = requests.get(full_url, timeout=10, allow_redirects=True)
 
-                        # Vérifie dans tout l'historique de redirection HTTP
                         for step in r.history + [r]:
                             if not is_same_domain(step.url, url_target):
                                 continue
@@ -2949,17 +3004,43 @@ def is_there_a_vuln(versions, url_target):
                 pass
 
 
+    def redirect_test(url_target):
+        payload_variants = [
+            f"%0ahttps://github.com",
+            f"%0dhttps://github.com",
+            f"%0d%0ahttps://github.com",
+            f"%250ahttps://github.com",
+            f"%0a//github.com",
+            f"%0a/\\github.com",
+            f"%0a//%2Fgithub.com",
+            f"//github.com",
+            f"%0a%2F%2Fgithub.com",
+            f"%0Ahttps://github.com",
+        ]
+        print(f"{G}[+] Testing open redirect payloads")
 
-    nextjs(versions)
-    drupal(versions)
-    struts2(versions)
-    php(versions)
+        for variant in payload_variants:
+            test_url = f"{url_target}/{variant}"
+            try:
+                response = requests.get(test_url, allow_redirects=False, timeout=10)
+                status = response.status_code
+                location = response.headers.get('Location', '')
+                
+                if status in [301, 302, 303, 307, 308] and location:
+                    print(f"{C}    [*] {Y}{test_url} {C}→ {G}Location : {location} {R}[{status}]")
+
+            except requests.RequestException as e:
+                pass
+
+
+    cve_nvd_search(versions)
     check_headers(url_target)
     test_sql_injection_reflected(url_target)
     test_reflected_xss(url_target)
     test_php_backup_files(url_target)
     test_sensitive_files(url_target)
-    
+    redirect_test(url_target)
+
 
 ###############################################################################################################
 ################################################### main menu #################################################
@@ -2992,7 +3073,7 @@ def main():
     parser.add_argument("--exclude", nargs='+',
                         help="Exclude specifics parameters like id=X or ?image=X or something.php (ex : --exclude image,id,php)", default=[])
     parser.add_argument("-o", "--output", help="Output file to save extracted results (-e ; -w ; --robots)")                    
-    parser.add_argument("-wp", "--wordpress", action="store_true", help="Basic Wordpress scan")
+    parser.add_argument("-wp", "--wordpress", action="store_true", help="Full WordPress scan with no limitations for vulnerable version detection")
     parser.add_argument("-s", '--subdomains', action="store_true", help=f"Enum target subdomains")
     parser.add_argument("-t", '--traversal', action="store_true", help=f"Try to exploit path traversal. Payloads into payloads/traversal.txt")
     parser.add_argument("-op", '--open-redirect', action="store_true", help=f"Try to exploit path open redirect. Payloads into payloads/open_redirect.txt")
@@ -3336,6 +3417,7 @@ def main():
             "wp-login.php",
             "wp-content/uploads/",
             "wp-json/wp/v2/users",
+            "wp-json/wp/v2/settings",
             "wp-json/wp/v2/posts",
             "wp-includes/",
             "wp-config.php",
@@ -3508,31 +3590,8 @@ def main():
         if not args.url.startswith(('http://', 'https://')):
             args.url = 'https://' + args.url
         
-        print(f"\n{M}[Info] {C}Wappalyzer analysis")    
         versions = wappalyze_that(args.url, cookies)
-        for url, techs in versions.items():
-            if not techs:
-                print(f"{M}[-] No technologies found")
-                continue
-               
-            for tech_name, details in techs.items():
-                version = details.get("version", "")
-                confidence = details.get("confidence", 0)
-                categories = details.get("categories", [])
-                groups = details.get("groups", [])
-
-                if version and version != "":
-                    version_display = f"{R}{version}" # red color
-                else:
-                    version_display = f"{Y}/"
-
-                print(f"{M}[+] {G}Technology : {Y}{tech_name}")
-                print(f"    {G}Version    : {version_display}")
-                print(f"    {G}Confidence : {Y}{confidence}%")
-                print(f"    {G}Categories : {Y}{', '.join(categories) if categories else 'none'}")
-                print(f"    {G}Groups     : {Y}{', '.join(groups) if groups else 'none'}")
-                print("")
-                    
+ 
         
 
     if args.vuln:
