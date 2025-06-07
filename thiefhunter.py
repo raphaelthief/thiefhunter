@@ -2532,7 +2532,7 @@ def is_there_a_vuln(versions, url_target):
                         description = desc.get("value")
                         break
 
-                # Extract CVSS v3.1 or v3.0 severity
+                # Extract CVSS severity and score
                 severity = "N/A"
                 score = "N/A"
                 metrics = item.get("cve", {}).get("metrics", {})
@@ -2549,7 +2549,11 @@ def is_there_a_vuln(versions, url_target):
                     severity = cvss_data.get("baseSeverity", "N/A")
                     score = cvss_data.get("baseScore", "N/A")
 
-                cve_list.append((cve_id, description, severity, score))
+                # Get exploit references
+                references = item.get("cve", {}).get("references", [])
+                exploit_urls = [ref["url"] for ref in references if "Exploit" in ref.get("tags", [])]
+
+                cve_list.append((cve_id, description, severity, score, exploit_urls))
             return cve_list
 
 
@@ -2569,9 +2573,9 @@ def is_there_a_vuln(versions, url_target):
           
             for poc in cve_data['pocs']:
                 print(f"     {C}-----")
-                print(f"     {C}→ {Y}Exploit : {Y}{poc.get('name', 'N/A')}")
-                print(f"     {C}→ {Y}Stars   : {Y}{poc.get('stargazers_count', '0')}")
-                print(f"     {C}→ {Y}{poc.get('html_url', 'N/A')}")
+                print(f"     {C}→ {G}Exploit : {Y}{poc.get('name', 'N/A')}")
+                print(f"     {C}→ {G}Stars   : {Y}{poc.get('stargazers_count', '0')}")
+                print(f"     {C}→ {G}{poc.get('html_url', 'N/A')}")
 
         for url, technologies in versions.items():
             for tech_name, tech_data in technologies.items():
@@ -2590,10 +2594,12 @@ def is_there_a_vuln(versions, url_target):
                         print(f"    {C}[*] {G}CPE found  : {Y}{cpe}")
                         cves = get_cves_for_cpe(cpe)
                         print(f"    {C}[*] {G}CVEs found : {Y}{len(cves)}")
-                        for cve_id, desc, severity, score in cves:
+                        for cve_id, desc, severity, score, exploits in cves:
                             print(f"    {R}[!] {C}{cve_id} {R}[{severity} → {score}]")
                             print(f"     {C}→ {Y}{desc[:100]}...")
-                            
+                            if exploits:
+                                for url in exploits:
+                                    print(f"     {C}→ {G}NVD Exploit : {Y}{url}")
                             cve_data = fetch_cve_data(cve_id)
                             display_cve_data(cve_data)
                             #time.sleep(1.5)
