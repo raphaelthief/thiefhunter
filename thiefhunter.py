@@ -998,10 +998,9 @@ def highlight_keywords(text, keywords):
     return text
 
 # Target subdomains enum
-def subreponse(domain):
-    global proxies
-
-    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+def subreponse2(domain):
+    print(f"{Fore.YELLOW}[!] Subdomains for {Fore.CYAN}{domain}")
+    
     KEYWORDS = [
         'admin', 'api', 'file', 'intranet', 'pwd', 'pass',
         'config', 'dev', 'test', 'staging', 'panel', 'secret',
@@ -1023,128 +1022,9 @@ def subreponse(domain):
         'logout', 'change-password', 'unlock', 'identity', 'idp',
         'authenticator', 'authorization', 'authserver', 'auth-api'    
     ]
-
-
-
-
-
-
-
-
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }    
-    
-    url = f"https://crt.sh/?q={domain}"
-    try:
-
-        if torusage == "yes":
-            proxies = tor_proxies
-     
-        
-        response = requests.get(url, proxies=proxies, headers=headers)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"{M}[Error] {R}Request error to {url} : {e}")
-        return
-
-    soup = BeautifulSoup(response.text, 'html.parser')
     
     
-    try:
-        table = soup.find_all('table')[1] 
-        rows = table.find_all('tr')[1:]  
-    except IndexError:
-        print(f"{M}[Error] {R}No valid data found on {url}")
-        return    
-
-    certificates = {}
-    for row in rows:
-        cols = row.find_all('td')
-        if len(cols) >= 6:
-            cert_id = cols[0].text.strip()
-            logged_at = cols[1].text.strip()
-            not_before = cols[2].text.strip()
-            not_after = cols[3].text.strip()
-            common_name = cols[4].text.strip()
-
-            if common_name not in certificates or logged_at > certificates[common_name]['logged_at']:
-                certificates[common_name] = {
-                    "cert_id": cert_id,
-                    "logged_at": logged_at,
-                    "not_before": not_before,
-                    "not_after": not_after,
-                    "common_name": common_name
-                }
-
-    if not certificates:
-        print(f"{M}[!] {G}No subdomains found for {Y}{domain}")
-        return
-
-    print(f"{M}[!] {G}Subdomains for {Y}{domain}")
-    print(f"{M}[?] {G}Source : {Y}crt.sh")
-    print("-" * 50)
-    
-    for cert in certificates.values():
-        test_url = f"http://{cert['common_name']}"  # HTTP default        
-        try:
-            
-            if torusage == "yes":
-                proxies = tor_proxies
-         
-            
-            test_response = requests.get(test_url, proxies=proxies, headers=headers, timeout=10)
-            status = test_response.status_code
-            statuscode = test_response.status_code
-            statusV = "/"
-            if status == 403 or status == 200:
-                if detect_login_page(test_response.text):
-                    status = f"login page [{R}{statuscode}{G}]"            
-            
-        except requests.exceptions.Timeout as e:
-            status = f"Timedout [{R}{statuscode}{G}]"
-            if verbosity == "yes":
-                statusV = e
-            test_url = "/"
-        except requests.exceptions.ConnectionError as e:
-            if "getaddrinfo failed" in str(e):
-                status = f"DNS resolution failed [{R}{statuscode}{G}]"
-                if verbosity == "yes":
-                    statusV = e
-            else:
-                status = f"Connection error [{R}{statuscode}{G}]"
-                if verbosity == "yes":
-                    statusV = e
-            test_url = "/"
-        except requests.exceptions.RequestException as e:
-            status = f"Unexpected error [{R}{statuscode}{G}]"
-            if verbosity == "yes":
-                statusV = e
-            test_url = "/"
-            
-        print(f"{G}[+] {Y}Common Name    : {C}{cert['common_name']}")
-        print(f"{G}[+] {Y}Logged At      : {G}{cert['logged_at']}")
-        print(f"{G}[+] {Y}More Infos     : {G}https://crt.sh/?id={cert['cert_id']}{Y}")
-        print(f"{G}[+] {Y}Satus          : {G}{status}{Y}")
-        
-        if verbosity == "yes":
-            print(f"{G}[+] {Y}Satus verbose  : {G}{statusV}{Y}")
-            
-        print(f"{G}[+] {Y}Direct URL     : {G}{test_url}{Y}")
-        print("-" * 50)
-        
-        time.sleep(1)
-
-
-
-# Target subdomains enum
-def subreponse2(domain, api_key):
-    
-
-    
-    
-    print(f"{Fore.YELLOW}[!] Subdomains for {Fore.CYAN}{domain}")
+    api_key = "virustotal_token.txt"
     with open(api_key, 'r') as f:
         token = f.read().strip()
         if token == '':
@@ -1265,18 +1145,6 @@ def subreponse2(domain, api_key):
         
         time.sleep(0.5)
         
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ###############################################################################################################
@@ -2570,7 +2438,7 @@ def is_there_a_vuln(versions, url_target):
         def display_cve_data(cve_data):
             if not cve_data or 'pocs' not in cve_data:
                 return
-          
+
             for poc in cve_data['pocs']:
                 print(f"     {C}-----")
                 print(f"     {C}→ {G}Exploit : {Y}{poc.get('name', 'N/A')}")
@@ -3445,7 +3313,7 @@ def main():
 
         extracted = tldextract.extract(domain)
         base_domain = f"{extracted.domain}.{extracted.suffix}"
-        subreponse(base_domain)
+        subreponse2(base_domain)
 
 
     if args.traversal:
