@@ -1,6 +1,6 @@
 import argparse, requests, time, re, warnings, tldextract, urllib3, os, difflib, logging, random, threading, signal, sys, subprocess, shlex, pprint, http.client, json, textwrap
 import concurrent.futures
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from urllib.parse import urlparse, urljoin, parse_qs, parse_qsl, urlencode, urlunparse
 from colorama import init, Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
