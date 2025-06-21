@@ -4,7 +4,7 @@
 ThiefHunter is a bug hunting and penetration testing tool designed to identify security vulnerabilities efficiently. It combines advanced crawling, URL analysis, and vulnerability exploitation techniques, making it a versatile tool
 
 
-![Main menu](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/Main.JPG "Main menu")
+![Main menu](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/Main1.PNG "Main menu")
 
 
 
@@ -30,6 +30,12 @@ ThiefHunter is a bug hunting and penetration testing tool designed to identify s
     - Enumerate usernames through exposed API endpoints
     - Detect WordPress version from metadata, assets, and accessible files
 
+- CVE & Exploits detection :
+    - Wappalyzer and source code detection for wordpress, plugins and themes detection
+    - No token, no rates limits for exploit detections
+    - Passive detection
+    - CVE based from wappalyzer detection for all the other websites
+    - Exploits detection based on CVE detections
 
 - Comprehensive Link Analysis :
     - Extract URLs from Wayback Machine, robots.txt, and sitemap.xml
@@ -63,7 +69,7 @@ python thiefhunter.py [OPTIONS]
 ```
 
 
-![help](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/help.JPG "help")
+![help](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/Help1.PNG "help")
 
 
 
@@ -81,6 +87,20 @@ python thiefhunter.py -u https://example.com -e --normalize --exclude php
 ```
 
 ![exclude](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/exclude.JPG "exclude")
+
+
+``` bash
+python thiefhunter.py -u https://example.com -wp
+```
+
+![WP_detection](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/wordpress.png "WP_detection")
+
+
+``` bash
+python thiefhunter.py -u https://example.com --vuln
+```
+
+![CVE_detection](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/cve.png "CVE_detection")
 
 
 
