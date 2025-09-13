@@ -6,6 +6,12 @@ ThiefHunter is a bug hunting and penetration testing tool designed to identify s
 
 ![Main menu](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/Main1.PNG "Main menu")
 
+## UPDATES
+[14/09/2025]
+- Path traversal enumerations
+- Display full information with summary
+- Enumeration and automatic detection of users with traversal on their home directories
+- Traversal on Linux and Windows
 
 
 ## Key Features
