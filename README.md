@@ -7,6 +7,19 @@ ThiefHunter is a bug hunting and penetration testing tool designed to identify s
 ![Main menu](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/Main1.PNG "Main menu")
 
 ## UPDATES
+[20/09/2025]
+- JWT decoding without signature verification
+- Detection of common JWT vulnerabilities (alg=none, HMAC brute-force, algorithm confusion RS→HS)
+- Suggest Hashcat commands for HMAC brute-force attacks, including:
+    - Full charset brute-force : letters (a-z, A-Z), digits (0-9), and special characters
+    - Alphanumeric brute-force : letters (a-z, A-Z) and digits only (0-9)
+    - Letters only : lowercase and uppercase (a-z, A-Z)
+    - Lowercase + digits only (a-z, 0-9)
+    - Lowercase only (a-z)
+    - Wordlist-based attack
+- Generate vulnerable alg=none tokens for testing
+- Display exp, iat, and optional JWT fields (iss, aud, sub, name, admin)
+
 [14/09/2025]
 - Path traversal enumerations
 - Display full information with summary
