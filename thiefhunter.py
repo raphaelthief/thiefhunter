@@ -3548,13 +3548,36 @@ def check_vulnerabilities(header, payload, token):
         vulnerabilities.append(f"{G}--> Check if the HMAC key is weak or guessable ({R}Hashcat attacks{G})")
 
         # Suggested Hashcat commands (CPU/GPU brute-force)
-        hashcat_bruteforce.append(f"{G}[+] a - z | A - Z | 0 - 9 | Special chars \n{Y}hashcat -m 16500 -a 3 {token} ?a?a?a?a?a?a?a?a")
-        hashcat_bruteforce.append(f"{G}[+] a - z | A - Z | 0 - 9 \n{Y}hashcat -m 16500 -a 3 -1 ?l?u?d {token} ?1?1?1?1?1?1?1?1")
-        hashcat_bruteforce.append(f"{G}[+] a - z | A - Z \n{Y}hashcat -m 16500 -a 3 {token} ?l?u?l?u?l?u?l?u?l?u?l?u?l?u?l?u")
-        hashcat_bruteforce.append(f"{G}[+] a - z | 0 - 9 \n{Y}hashcat -m 16500 -a 3 -1 ?l?d {token} ?l?l?l?l?l?l?l?l")
-        hashcat_bruteforce.append(f"{G}[+] a - z  \n{Y}hashcat -m 16500 -a 3 {token} ?1?1?1?1?1?1?1?1")
-        hashcat_bruteforce.append(f"{G}[+] Wordlist \n{Y}hashcat -m 16500 -a 0 {token} wordlist.txt")
-
+        # a - z | A - Z | 0 - 9 | Special chars
+        hashcat_bruteforce.append(
+            f"{G}[+] a - z | A - Z | 0 - 9 | Special chars \n"
+            f"{Y}hashcat -m 16500 -a 3 {token} ?a?a?a?a?a?a?a?a"
+        )
+        # a - z | A - Z | 0 - 9
+        hashcat_bruteforce.append(
+            f"{G}[+] a - z | A - Z | 0 - 9 \n"
+            f"{Y}hashcat -m 16500 -a 3 -1 ?l?u?d {token} ?1?1?1?1?1?1?1?1"
+        )
+        # a - z | A - Z
+        hashcat_bruteforce.append(
+            f"{G}[+] a - z | A - Z \n"
+            f"{Y}hashcat -m 16500 -a 3 -1 ?l?u {token} ?1?1?1?1?1?1?1?1"
+        )
+        # a - z | 0 - 9
+        hashcat_bruteforce.append(
+            f"{G}[+] a - z | 0 - 9 \n"
+            f"{Y}hashcat -m 16500 -a 3 -1 ?l?d {token} ?1?1?1?1?1?1?1?1"
+        )
+        # a - z
+        hashcat_bruteforce.append(
+            f"{G}[+] a - z  \n"
+            f"{Y}hashcat -m 16500 -a 3 {token} ?l?l?l?l?l?l?l?l"
+        )
+        # Wordlist
+        hashcat_bruteforce.append(
+            f"{G}[+] Wordlist \n"
+            f"{Y}hashcat -m 16500 -a 0 {token} wordlist.txt"
+        )
         jwt_none.append(f"\n{G}[+] Generate a vulnerable token with {R}alg=none{Y}")
         jwt_none.append(create_alg_none_token(payload))
 
@@ -4391,3 +4414,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
