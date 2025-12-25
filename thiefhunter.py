@@ -748,10 +748,27 @@ def check_url_exists(url):
         return False
 
 
-def process_page(url):
+def process_page(url, cookies):
     """Download and analyze a page to extract emails, phone numbers, sensitive files, and confidential information"""
+    global proxies
+    
     try:
-        response = requests.get(url, timeout=10)
+        if user_agents == "yes":
+            headersX = loadit("payloads/user_agents.txt")
+            headers = {
+                "User-Agent": random.choice(headersX)
+            }        
+        else:
+            headers = None
+
+        cookies = cookies or {}        
+        
+        if torusage == "yes":
+            proxies = tor_proxies
+        else:
+            proxies = proxies
+            
+        response = requests.get(url, headers=headers, proxies=proxies, cookies=cookies, timeout=10)
         if response.status_code == 200:
             html_content = response.text
             
@@ -4210,13 +4227,13 @@ def main():
             print(f"{M}[Info] {C}Searching for sensitive data on base target {args.url}...")
             for links in outputlist:
                 print(f"\n{M}[!] {C}[view-source:{links}]")
-                process_page(links)
+                process_page(links, cookies)
         else:    
             if not args.url.startswith(('http://', 'https://')):
                 args.url = 'http://' + args.url
             print(f"{M}[Info] {C}Searching for sensitive data on {args.url}...")
             print(f"\n{M}[!] {C}[view-source:{args.url}]")
-            process_page(args.url)  
+            process_page(args.url, cookies)  
 
       
     # Save results to a file if requested
@@ -4414,4 +4431,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
