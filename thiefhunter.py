@@ -1507,10 +1507,22 @@ def display_results(result):
      
     if unique_items:
         vulns_path = "payloads/wp_vulns.json"
+        token_path = "tokens/wordfence.txt"
+        
+        if not os.path.isfile(token_path):
+            print(f"{R}  - [!] Wordfence token not found in {token_path}")
+            return
+
+        with open(token_path, "r") as f:
+            token = f.read().strip()
+
         if not os.path.isfile(vulns_path) or (time.time() - os.path.getmtime(vulns_path)) > 86400:
             print(f"{G}  - [i] wp_vulns.json is missing or outdated. Downloading a fresh copy...")
             try:
-                response = requests.get("https://www.wordfence.com/api/intelligence/v3/vulnerabilities/production", timeout=60)
+                headers = {
+                    "Authorization": f"Bearer {token}"
+                }
+                response = requests.get("https://www.wordfence.com/api/intelligence/v3/vulnerabilities/production", headers=headers, timeout=60, verify=False)
                 response.raise_for_status()
                 with open(vulns_path, "wb") as f:
                     f.write(response.content)
@@ -1626,7 +1638,7 @@ def display_results(result):
     print(f"\n{M}[Info] {G} Wordpress versions vulns : https://wpscan.com/wordpresses/")
     print(f"{M}[Info] {G} Wordpress plugins vulns  : https://wpscan.com/plugins/")
     print(f"{M}[Info] {G} Wordpress thmes vulns    : https://wpscan.com/themes/")
-    print(f"{M}[Info] {G} Wordfense free API       : https://www.wordfence.com/api/intelligence/v2/vulnerabilities/production")
+    print(f"{M}[Info] {G} Wordfense free API       : https://www.wordfence.com/api/intelligence/v3/vulnerabilities/production")
 
 
 def detect_wordpress_version(url, cookies):
