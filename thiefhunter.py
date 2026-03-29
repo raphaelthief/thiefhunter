@@ -1510,7 +1510,7 @@ def display_results(result):
         if not os.path.isfile(vulns_path) or (time.time() - os.path.getmtime(vulns_path)) > 86400:
             print(f"{G}  - [i] wp_vulns.json is missing or outdated. Downloading a fresh copy...")
             try:
-                response = requests.get("https://www.wordfence.com/api/intelligence/v2/vulnerabilities/production", timeout=60)
+                response = requests.get("https://www.wordfence.com/api/intelligence/v3/vulnerabilities/production", timeout=60)
                 response.raise_for_status()
                 with open(vulns_path, "wb") as f:
                     f.write(response.content)
