@@ -1516,6 +1516,13 @@ def display_results(result):
         with open(token_path, "r") as f:
             token = f.read().strip()
 
+        if not token or token == "<YOUR_TOKEN>":
+            print(f"{R}  - [!] Wordfence token is empty or not configured in {token_path}")
+            return
+
+        with open(token_path, "r") as f:
+            token = f.read().strip()
+
         if not os.path.isfile(vulns_path) or (time.time() - os.path.getmtime(vulns_path)) > 86400:
             print(f"{G}  - [i] wp_vulns.json is missing or outdated. Downloading a fresh copy...")
             try:
