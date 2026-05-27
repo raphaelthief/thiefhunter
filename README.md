@@ -1,159 +1,258 @@
-# thiefhunter
+# thiefhunter v2
 
+ThiefHunter is an offensive security framework designed for real-world reconnaissance, vulnerability research and adaptive web exploitation.
+Built for pentesters, bug bounty hunters and auditors, it focuses on high signal enumeration, low-noise OPSEC, and context-aware attack automation.
+The tool focusses on adaptive offensive automation with practical OPSEC awareness.
 
-ThiefHunter is a bug hunting and penetration testing tool designed to identify security vulnerabilities efficiently. It combines advanced crawling, URL analysis, and vulnerability exploitation techniques, making it a versatile tool
-
-
-![Main menu](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/Main1.PNG "Main menu")
-
-## UPDATES
-[20/09/2025]
-- JWT decoding without signature verification
-- Detection of common JWT vulnerabilities (alg=none, HMAC brute-force, algorithm confusion RS→HS)
-- Suggest Hashcat commands for HMAC brute-force attacks, including:
-    - Full charset brute-force : letters (a-z, A-Z), digits (0-9), and special characters
-    - Alphanumeric brute-force : letters (a-z, A-Z) and digits only (0-9)
-    - Letters only : lowercase and uppercase (a-z, A-Z)
-    - Lowercase + digits only (a-z, 0-9)
-    - Lowercase only (a-z)
-    - Wordlist-based attack
-- Generate vulnerable alg=none tokens for testing
-- Display exp, iat, and optional JWT fields (iss, aud, sub, name, admin)
-
-[14/09/2025]
-- Path traversal enumerations
-- Display full information with summary
-- Enumeration and automatic detection of users with traversal on their home directories
-- Traversal on Linux and Windows
+![Main menu](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Main.png "Main menu")
 
 
 ## Key Features
+### Advanced Vulnerability Enumeration
+Wordfence API Integration (No WPScan-style token limitations)
+ThiefHunter leverages the Wordfence vulnerability intelligence API for WordPress vulnerability enumeration.
 
-- Targeted URL Scanning : Crawl and analyze target URLs to extract links, detect sensitive parameters, and uncover vulnerabilities
-- Batch Scanning : Support for scanning multiple URLs loaded from a file, with tailored options for various vulnerability types
-- Customizable HTTP Requests :
-    - Randomized user-agent headers for realistic simulations
-    - Custom cookie support
-    -  Proxy and Tor network integration for anonymity
+Advantages:
+- no WPScan token quota limitations
+- scalable enumeration
+- plugin/theme vulnerability correlation
+- continuous CVE intelligence integration
 
-
-- Vulnerability Detection :
-    - Path Traversal : Automated testing using predefined payloads
-    - Open Redirects : Payload injection to identify unsafe redirects
-    - CRLF Injection : Check for header injection vulnerabilities
-    - Clickjacking : Assess X-Frame-Options and Content Security Policy headers
+This allows large-scale WordPress audits without artificial API restrictions.
 
 
-- WordPress Scanning :
-    - Identify plugins, themes, and their versions
-    - Enumerate usernames through exposed API endpoints
-    - Detect WordPress version from metadata, assets, and accessible files
+### Hybrid Technology Detection Engine
+Technology identification combines multiple layers:
+- deprecated but still extremely effective Wappalyzer fingerprints
+- WebTech API
+- custom manual regex fingerprinting
+- contextual version extraction
 
-- CVE & Exploits detection :
-    - Wappalyzer and source code detection for wordpress, plugins and themes detection
-    - No token, no rates limits for exploit detections
-    - Passive detection
-    - CVE based from wappalyzer detection for all the other websites
-    - Exploits detection based on CVE detections
+This hybrid approach significantly improves:
+- framework detection
+- CMS identification
+- version accuracy
+- hidden technology discovery
 
-- Comprehensive Link Analysis :
-    - Extract URLs from Wayback Machine, robots.txt, and sitemap.xml
-    - Normalize and deduplicate query parameters to streamline results
-    - Highlight URLs with sensitive parameters or specific extensions (ex : .php)
+![Version detection](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/vuln_function_versions_detection.png "Version detection")
 
 
-- Integrated Tools :
-    - SQLmap for SQL injection testing (https://github.com/sqlmapproject/sqlmap)
-    - Dalfox for XSS vulnerability checks (https://github.com/hahwul/dalfox)
-    - Nuclei for advanced template-based scans (https://github.com/projectdiscovery/nuclei)
-    - Wpscan for advanced wordpress scans (https://github.com/wpscanteam/wpscan)
+### Intelligent CVE & Exploit Correlation
+After technology enumeration, ThiefHunter uses the Search-Vulns project to:
+- generate accurate CPEs
+- identify relevant CVEs
+- correlate public exploits
+- reduce false positive mappings
+
+Instead of dumping generic CVEs, the framework attempts to identify the most relevant attack surface based on detected versions and technologies.
+
+![CVE and EXPLOITS detection](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/vuln_function_CVE_detection.png "CVE and EXPLOITS detection")
 
 
-- IP Configuration Check : Validate and display global IP configurations, including Tor-based setups
-- Verbose Output and Logging : Enable detailed logs for in-depth analysis and troubleshooting
+============================================================================================
+
+**This section is entirely based on the high-quality work of ra1nb0rn, using the API available here: https://search-vulns.com/**
+
+I was responsible for handling communication with its API and displaying the results through the CVE_vuln_displayer.py module
+
+Project repository available here: https://github.com/ra1nb0rn/search_vulns
+
+### Credits: ```ra1nb0rn```
+
+============================================================================================
+
+
+### Adaptive Path Traversal Engine
+The traversal engine was designed around real exploitation behavior rather than simple payload spraying.
+
+The traversal module achieved:
+
+100% successful exploitation coverage across PortSwigger path traversal labs using adaptive payload generation and contextual mutation.
+
+Features include:
+- Linux payloads
+- Windows payloads
+- mixed slash bypasses
+- UTF-8 traversal variants
+- double URL encoding
+- NULL byte injections
+- path normalization bypasses
+- extension-aware payload generation
+- OS-aware mutation logic
+
+The engine automatically adapts based on:
+- detected operating system
+- endpoint context
+- parameter naming
+- response signatures
+- discovered file extensions
+
+instead of blindly replaying static payload lists.
+
+![Traversal detection](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/traversal_detection.png "Traversal detection")
+
+![Adaptive enum](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Traversal_valid_enum.png "Adaptive enum")
+
+![Traversal display](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Traversal_result_display.png "Traversal display")
+
+
+### Subdomain Enumeration Engine
+ThiefHunter includes layered subdomain enumeration with duplicate filtering and source prioritization.
+
+```--wtf``` Passive Discovery
+
+During deep scans, the framework can identify subdomains directly from:
+- HTML source code
+- JavaScript files
+- frontend assets
+- leaked API references
+
+This often reveals internal or forgotten infrastructure missed by classic enumeration tools.
+
+```--subdomain``` Enumeration Strategy
+
+Enumeration order:
+- DNSDumpster (API)
+- crt.sh
+- VirusTotal (API)
+- manual sensitive subdomain bruteforce
+
+crt.sh instability is handled through:
+- automatic retries
+- repeated 502 recovery attempts
+- resilient fallback logic
+(up to 10 retries automatically)
+
+
+### Sensitive Subdomain Discovery
+If public sources fail to enumerate critical infrastructure, ThiefHunter performs additional detection against sensitive targets such as:
+- admin panels
+- VPN gateways
+- staging environments
+- CI/CD endpoints
+- internal APIs
+- developer platforms
+
+
+### Offensive JWT Toolkit
+ThiefHunter includes a dedicated JWT attack module capable of:
+- decoding
+- validation
+- mutation
+- re-signing
+- algorithm confusion testing
+- malicious token generation
+
+Supported attacks:
+- alg:none
+- RS256 → HS256 confusion
+- kid path traversal
+- kid NULL byte injection
+- jku injection
+- x5u injection
+- embedded JWK injection
+- signature bypass attempts
+- offline HMAC cracking support
+
+Supported algorithms:
+- HS256 / HS384 / HS512
+- RS256 / RS384 / RS512
+- ES256 / ES384 / ES512
+- EdDSA
+
+![JWT displayer](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_display.png "JWT displayer")
+
+![JWT sub modification](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_edit_sub.png "JWT sub modification")
+
+![JWT jwk injection](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_jwk_injection.png "JWT jwk injection")
+
+![JWT jwk display](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_jwk_injection_output.png "JWT jwk display")
 
 
 
-## Setup
-
-The usage of external tools depends on the .txt files located in the install_paths folder
-You only need to specify the installation directories of third-party programs in these files for their integration
-
-
-
-## Usage
-
-``` bash
-python thiefhunter.py [OPTIONS]
+### OPSEC & Tor-Oriented Networking
+A strong focus was placed on operational security and DNS leak prevention.
+The framework prioritizes:
+```
+SOCKS_PROXY = {
+    "http": "socks5h://127.0.0.1:9050",
+    "https": "socks5h://127.0.0.1:9050",
+}
 ```
 
-
-![help](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/Help1.PNG "help")
-
-
-
-## Exemples
-
-``` bash
-python thiefhunter.py -u https://example.com -e --normalize
+```
+sock = socks.socksocket()
+sock.set_proxy(
+    socks.SOCKS5,
+    "127.0.0.1",
+    9050,
+    rdns=True
+)
 ```
 
-![normalize](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/normalize.JPG "normalize")
+Using socks5h ensures:
+- remote DNS resolution
+- reduced DNS leak risks
+- improved anonymity consistency
+- Native Tor Validation
+
+The ```--tor``` option includes:
+- automatic Tor routing
+- SOCKS5 proxy enforcement
+- DNS-through-proxy resolution
+- Tor usage verification through TorProject APIs
+
+The framework attempts to prevent common OPSEC mistakes frequently overlooked in offensive tooling.
 
 
-``` bash
-python thiefhunter.py -u https://example.com -e --normalize --exclude php
-```
+### Centralized Request Architecture
+All HTTP requests are centralized into a dedicated dependency layer.
 
-![exclude](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/exclude.JPG "exclude")
+Advantages:
+- simplified maintenance
+- unified proxy handling
+- easier TLS management
+- consistent headers/session logic
+- centralized OPSEC controls
 
-
-``` bash
-python thiefhunter.py -u https://example.com -wp
-```
-
-![WP_detection](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/wordpress.png "WP_detection")
-
-
-``` bash
-python thiefhunter.py -u https://example.com --vuln
-```
-
-![CVE_detection](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/cve.png "CVE_detection")
+This architecture also prepares future improvements around:
+- persistent sessions
+- TLS fingerprint reduction
+- request normalization
+- reduced negotiation overhead
+while already minimizing unnecessary requests whenever possible.
 
 
+### Additional Modules
+- Web Application Firewall detection
+- CRLF injection testing
+- Open Redirect testing
+- Wayback Machine extraction
+- recursive crawling
+- secret leakage detection
+- GitHub commit email intelligence
+- security header auditing
+- TLS configuration auditing
+- dangerous HTTP method detection
+- and more...
 
-``` bash
-python thiefhunter.py -u https://example.com --ip-check
-```
+![Github extraction](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/github_OPSEC.png "Github extraction")
 
-- Exemple 1 : No use of Tor or other external tools
-
-![ex1](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/checkip1.JPG "ex1")
-
-
-- Exemple 2 : Usage of the internal Tor proxy within ThiefHunter but no usage for external programs triggered by thiefHunter
-
-![ex2](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/checkip2.JPG "ex2")
-
-
-- Exemple 3 : Use of Tor via an external program (ex : Torsocks) with Tor's exit IP applied to external programs triggered by thiefHunter
-
-![ex3](https://github.com/raphaelthief/thiefhunter/blob/main/Pic/checkip3.JPG "ex3")
-
+![Github OPSEC emails](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/github_OPSEC_diplay.png "Github OPSEC emails")
 
 
 ## Disclaimer
+ThiefHunter v2 is a penetration testing and bug hunting tool designed exclusively for ethical hacking and authorized security assessments. Misuse of this tool for illegal purposes, unauthorized attacks, or activities outside the scope of the law is strictly prohibited.
 
 
-ThiefHunter is a penetration testing and bug hunting tool designed exclusively for ethical hacking and authorized security assessments. Misuse of this tool for illegal purposes, unauthorized attacks, or activities outside the scope of the law is strictly prohibited.
-
-
-By using ThiefHunter, you agree to the following :
+By using ThiefHunter v2, you agree to the following :
 
 You will only use this tool on systems and networks you own or have explicit permission to test.
+
 You acknowledge that unauthorized use may violate local, national, or international laws.
+
 The creator of ThiefHunter is not responsible for any damages, legal consequences, or ethical violations resulting from the misuse of this tool.
+
 Always prioritize responsible, legal, and ethical behavior when performing security testing.
 
 
