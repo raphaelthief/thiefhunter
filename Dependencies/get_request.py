@@ -193,42 +193,107 @@ def get_request_socket(args, url, headers=None):
         if parsed.query:
             path += "?" + parsed.query
 
+        method = getattr(args, "method", "GET").upper()
+
+        # =====================================================
+        # HEADERS
+        # =====================================================
         final_headers = build_headers(args)
         if headers:
             final_headers.update(headers)
-            
-        method = getattr(args, "method", "GET").upper()
 
-        # -------------------------
-        # BUILD RAW HTTP REQUEST
-        # -------------------------
+        # Add Host if missing
+        if "Host" not in final_headers:
+            final_headers["Host"] = host
+
+        # Force connection close for simpler recv logic
+        if "Connection" not in final_headers:
+            final_headers["Connection"] = "close"
+
+        # =====================================================
+        # BUILD RAW REQUEST
+        # =====================================================
         request = f"{method} {path} HTTP/1.1\r\n"
-        request += f"Host: {host}\r\n"
         for k, v in final_headers.items():
             request += f"{k}: {v}\r\n"
 
         request += "\r\n"
 
-        # -------------------------
-        # SOCKET CONNECTION
-        # -------------------------
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # =====================================================
+        # SOCKET
+        # =====================================================
+        timeout = getattr(args, "timeout", 15)
+
+        # --- TOR SOCKS5 ---
+        if getattr(args, "tor", False):
+            sock = socks.socksocket()
+            sock.set_proxy(socks.SOCKS5, "127.0.0.1", 9050, rdns=True)
+
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+
+        # =====================================================
+        # CONNECT
+        # =====================================================
         sock.connect((host, port))
+
+        # =====================================================
+        # TLS
+        # =====================================================
         if parsed.scheme == "https":
-            import ssl
             context = ssl.create_default_context()
+
+            # Better OPSEC than verify=False
+            context.check_hostname = True
+            context.verify_mode = ssl.CERT_REQUIRED
             sock = context.wrap_socket(sock, server_hostname=host)
 
-        sock.send(request.encode())
-        response = sock.recv(65535).decode(errors="ignore")
-        
+        # =====================================================
+        # SEND
+        # =====================================================
+        sock.sendall(request.encode())
+
+        # =====================================================
+        # RECEIVE FULL RESPONSE
+        # =====================================================
+        chunks = []
+        while True:
+            try:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+
+                chunks.append(chunk)
+            except socket.timeout:
+                break
+
+        raw_response = b"".join(chunks).decode(errors="ignore")
+        sock.close()
+
+        # =====================================================
+        # RESPONSE WRAPPER
+        # =====================================================
         class ResponseWrapper:
             def __init__(self, raw):
                 self.text = raw
-                self.status_code = int(raw.split(" ")[1])
-                self.headers = {}
+                try:
+                    self.status_code = int(raw.split("\r\n")[0].split(" ")[1])
+                except Exception:
+                    self.status_code = 0
 
-        return ResponseWrapper(response)
+                self.headers = {}
+                try:
+                    header_block = raw.split("\r\n\r\n", 1)[0]
+                    lines = header_block.split("\r\n")[1:]
+                    for line in lines:
+                        if ":" in line:
+                            k, v = line.split(":", 1)
+                            self.headers[k.strip()] = v.strip()
+                except Exception:
+                    pass
+
+        return ResponseWrapper(raw_response)
     except Exception as e:
         handle_error(e, "SOCKET Request error", args.verbose)
         return None
@@ -238,5 +303,18 @@ def get_request_socket(args, url, headers=None):
 # =========================================================
 # RESOLVE DOMAIN IP
 # =========================================================
-def resolve_ip(domain):
-    return socket.gethostbyname(domain)
+def resolve_ip(args, domain):
+    try:
+        if args.tor:
+            import socks
+            sock = socks.socksocket()
+            sock.set_proxy(
+                socks.SOCKS5,
+                "127.0.0.1",
+                9050,
+                rdns=True
+            )
+            return socket.gethostbyname(domain)
+        return socket.gethostbyname(domain)
+    except Exception as e:
+        return None
