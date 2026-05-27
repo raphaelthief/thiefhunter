@@ -1,4 +1,4 @@
-import requests, random, socket
+import requests, random, socket, ssl, socks
 from pathlib import Path
 from urllib.parse import urlparse
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
@@ -306,7 +306,6 @@ def get_request_socket(args, url, headers=None):
 def resolve_ip(args, domain):
     try:
         if args.tor:
-            import socks
             sock = socks.socksocket()
             sock.set_proxy(
                 socks.SOCKS5,
