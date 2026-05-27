@@ -313,7 +313,9 @@ def resolve_ip(args, domain):
                 9050,
                 rdns=True
             )
-            return socket.gethostbyname(domain)
+            socket.connect((domain, 80)) 
+            return socket.getpeername()[0] 
         return socket.gethostbyname(domain)
     except Exception as e:
+        handle_error(e, "resolve_ip error", args.verbose)
         return None
