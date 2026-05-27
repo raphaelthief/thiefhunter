@@ -1,0 +1,157 @@
+{
+  "jQuery": {
+    "detect": [
+      "jQuery JavaScript Library",
+      "\\$\\.fn\\.jquery",
+      "jQuery v",
+      "jquery[-.]"
+    ],
+    "version": [
+      "jQuery JavaScript Library v([0-9.]+)",
+      "jquery[-.]([0-9]+(?:\\.[0-9]+){1,3})",
+      "jQuery v([0-9]+(?:\\.[0-9]+){1,3})",
+      "define\\(\"jquery\".*?([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  },
+
+  "jQuery UI": {
+	"detect": [
+	  "jquery-ui",
+	  "jquery.ui",
+	  "ui\\.widget",
+	  "ui\\.controlgroup",
+	  "ui\\.dialog",
+	  "ui\\.datepicker"
+	],
+	"version": [
+	  "jquery-ui[-/ ]v?([0-9]+(?:\\.[0-9]+){1,3})",
+	  "jquery\\.ui[-/ ]v?([0-9]+(?:\\.[0-9]+){1,3})",
+	  "jQuery UI\\s*-\\s*v?([0-9]+(?:\\.[0-9]+){1,3})",
+	  "\\* jQuery UI - v([0-9]+(?:\\.[0-9]+){1,3})",
+	  "/jquery-ui/([0-9]+(?:\\.[0-9]+){1,3})/"
+	]
+  },
+
+  "jQuery Migrate": {
+    "detect": [
+      "jquery-migrate",
+      "JQMIGRATE",
+      "migrateWarn",
+      "migrateMute"
+    ],
+    "version": [
+      "jQuery Migrate\\s+([0-9]+(?:\\.[0-9]+){1,3})",
+      "jquery-migrate[-.]([0-9]+(?:\\.[0-9]+){1,3})",
+      "JQMIGRATE\\s*[:=]\\s*([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  },
+
+  "Lodash": {
+    "detect": [
+      "lodash",
+      "\\blodash\\b",
+      "_\\.debounce",
+      "_\\.throttle",
+      "_\\.cloneDeep",
+      "_\\.merge"
+    ],
+    "version": [
+      "lodash[-.]([0-9]+(?:\\.[0-9]+){1,3})",
+      "_\\.VERSION\\s*=\\s*[\"']([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  },
+
+  "Backbone.js": {
+    "detect": [
+      "Backbone",
+      "Backbone\\.Model",
+      "Backbone\\.View",
+      "Backbone\\.Collection",
+      "Backbone\\.Router"
+    ],
+    "version": [
+      "backbone[-.]([0-9]+(?:\\.[0-9]+){1,3})",
+      "Backbone\\.VERSION\\s*=\\s*[\"']([0-9]+(?:\\.[0-9]+){1,3})",
+      "Backbone\\s+v([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  },
+
+  "Bootstrap": {
+    "detect": [
+      "bootstrap",
+      "Bootstrap"
+    ],
+    "version": [
+      "bootstrap[-.]([0-9]+(?:\\.[0-9]+){1,3})",
+      "Bootstrap v([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  },
+
+  "React": {
+    "detect": [
+      "react",
+      "react-dom",
+      "data-reactroot",
+      "__REACT_DEVTOOLS_GLOBAL_HOOK__"
+    ],
+    "version": [
+      "react[-.]([0-9]+(?:\\.[0-9]+){1,3})",
+      "React\\.version\\s*=\\s*[\"']([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  },
+
+  "Next.js": {
+    "detect": [
+      "__NEXT_DATA__",
+      "_next/static",
+      "_next/image",
+      "_next/webpack",
+      "_next/data",
+      "__next_f"
+    ],
+    "version": [
+      "\"next\"\\s*:\\s*\"([0-9]+(?:\\.[0-9]+){1,3})\""
+    ]
+  },
+
+  "Angular": {
+    "detect": [
+      "ng-version",
+      "angular",
+      "@angular/core",
+      "Zone\\.js",
+      "ng-app",
+      "ng-controller"
+    ],
+    "version": [
+      "ng-version\\s*=\\s*[\"']([0-9]+(?:\\.[0-9]+){1,3})[\"']",
+      "AngularJS\\s+v([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  },
+
+  "anime.js": {
+    "detect": [
+      "anime",
+      "window\\.anime"
+    ],
+    "version": [
+      "anime\\.version\\s*=\\s*[\"']([0-9]+(?:\\.[0-9]+){1,3})[\"']",
+      "anime(?:\\.min)?\\.js\\?ver=([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  },
+
+  "core-js": {
+    "detect": [
+      "core-js",
+      "__core-js_shared__",
+      "core-js/modules",
+      "core-js/features",
+      "core-js/stable"
+    ],
+    "version": [
+      "core-js@([0-9]+(?:\\.[0-9]+){1,3})",
+      "cdn\\.jsdelivr\\.net/npm/core-js@([0-9]+(?:\\.[0-9]+){1,3})",
+      "unpkg\\.com/core-js@([0-9]+(?:\\.[0-9]+){1,3})"
+    ]
+  }
+}
