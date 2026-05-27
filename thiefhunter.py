@@ -264,7 +264,7 @@ def process_target(args, target_url):
             auditor(local_args)
             extracted_domain = extract_strictdomain(local_args.url)
             ssl_that(extracted_domain, local_args)
-            ip = resolve_ip(extracted_domain)
+            ip = resolve_ip(local_args, extracted_domain)
             ip_b64 = base64.b64encode(ip.encode("utf-8"))
             print(f"{Y}\n[!] {G}Interesting urls to visit")
             print(f" {G}- {W}https://www.shodan.io/host/{ip}")
