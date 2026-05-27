@@ -269,7 +269,7 @@ def test_ip_access(args):
     parsed = urlparse(args.url)
     domain = parsed.netloc
     try:
-        ip = resolve_ip(domain)
+        ip = resolve_ip(args, domain)
         print(f"{Y}[RESOLVED IP] {W}{ip}")
         ip_url = f"http://{ip}/"
         print(f"{Y}[TRYING] {R}http{W}://{ip}/ with 'Host: {domain}'")
