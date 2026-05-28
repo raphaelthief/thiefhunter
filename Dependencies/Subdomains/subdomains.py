@@ -246,7 +246,7 @@ def get_subdomains(args, domain: str) -> list:
     # -------------------------
     # 1. DNSDumpster
     # -------------------------
-    if not API_KEY:
+    if API_KEY:
         print(f"{G}[+] Searching on DNSDumpster ...")
         try:
             url = f"https://api.dnsdumpster.com/domain/{domain}"
