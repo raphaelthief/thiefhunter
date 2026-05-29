@@ -27,9 +27,6 @@ def format_dt(dt):
 
 
 def analyze_jwt(token: str):
-    if not is_jwt(token):
-        return {"error": "Format JWT invalide"}
-
     header_b64, payload_b64, signature = token.split('.')
 
     header = b64url_decode(header_b64)
