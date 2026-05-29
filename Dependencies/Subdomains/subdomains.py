@@ -174,7 +174,7 @@ def fetch_crtsh(args, domain: str, retries: int = 10): # 10 retry for crt.sh
             if args.verbose:
                 print(f"{Y}[INFO] {W}Attempt {attempt + 1}/{retries} for crt.sh")
 
-            response = get_request(args, url, timeout=30)
+            response = get_request(args, url, timeout=60)
             
             # retry error code 502
             if response.status_code == 502:
