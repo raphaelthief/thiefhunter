@@ -325,12 +325,11 @@ def get_subdomains(args, domain: str) -> list:
             pass
     else:
         print(f"{G}[-] No API KEY, skipping VirusTotal ...")
-    
+
     # -------------------------
     # 4. Active enumeration
     # -------------------------   
     print(f"{G}[+] Probing missing sensitive subdomains ...")
-
     to_probe = []
     for word in SENSITIVE_SUBDOMAINS:
         test_sub = f"{word}.{domain}"
@@ -349,8 +348,110 @@ def get_subdomains(args, domain: str) -> list:
             "suspicious": result.get("suspicious", False)
         }
 
+    # -------------------------
+    # Print results
+    # -------------------------   
     print()
+    subs = list(results.values())
+    longest = max(len(item['subdomain']) for item in subs)
+    displayed_subdomains = []
+    for item in subs:
+        if item.get("status") == "unreachable":
+            continue
+        
+        displayed_subdomains.append(item)
+        asn_name = item["asn_name"].upper()
+        is_proxy = (
+            is_reverse_proxy(item["asn_name"]) or
+            asn_name in ["(VIRUSTOTAL)", "(CRT.SH)", "(PROBE)"]
+        )
+        
+        color = W if is_proxy else R
+        warn = ""
+        if item.get("status") == "ssl_error":
+            warn = f"{Y} [SSL FAIL]"
+        elif item.get("suspicious"):
+            warn = f"{Y} [REDIRECT CHAIN]"
+
+        print(f"{G}[*] {Y}{item['subdomain']:<{longest}} → {color}{item.get('status', item['ip'])} {W}{item['asn_name']}{warn}")
+
+
     # -------------------------
-    # RETURN DEDUPED LIST (BY ORDER)
+    # Ask user if they want HTTP access checks
     # -------------------------
-    return list(results.values())
+    check_access = input(f"\n{Y}[?] Do you want to test access to discovered subdomains? (y/n): {C}").strip().lower()
+    if check_access in ["y", "yes"]:
+        print(f"{G}[+] Testing HTTP access on discovered subdomains ...")
+        for entry in displayed_subdomains:
+            sub = entry["subdomain"]
+
+            # -------------------------
+            # Try HTTPS first
+            # -------------------------
+            https_url = f"https://{sub}"
+            response = get_request(args, https_url, timeout=10)
+            url = https_url
+
+            # -------------------------
+            # Fallback HTTP
+            # -------------------------
+            if response is None:
+                http_url = f"http://{sub}"
+                response = get_request(args, http_url, timeout=10)
+
+                url = http_url
+
+            # No response at all
+            if response is None:
+                print(f"{W}[NO RESPONSE] {url}")
+                continue
+
+            suspicious = False
+            title = response.text.lower()
+            headers = response.headers
+            status = response.status_code
+            www_auth = str(headers.get("WWW-Authenticate", "")).lower()
+            login_keywords = [
+                "login",
+                "signin",
+                "sign-in",
+                "auth",
+                "authentication",
+                "admin",
+                "dashboard",
+                "portal"
+            ]
+
+            # -------------------------
+            # Classic HTML login page
+            # -------------------------
+            if status in [200, 401, 403]:
+                if any(keyword in title for keyword in login_keywords):
+                    suspicious = True
+
+            # -------------------------
+            # HTTP Basic/Digest popup
+            # -------------------------
+            if "basic" in www_auth or "digest" in www_auth:
+                suspicious = True
+
+            # -------------------------
+            # Status colors
+            # -------------------------
+            if status in [200, 401]:
+                status_color = R
+            elif status == 404:
+                status_color = W
+            else:
+                status_color = Y
+
+            # -------------------------
+            # Auth type display
+            # -------------------------
+            auth_type = ""
+            if "basic" in www_auth:
+                auth_type = " [HTTP BASIC AUTH]"
+            elif "digest" in www_auth:
+                auth_type = " [HTTP DIGEST AUTH]"
+
+            print(f"{status_color}[{status}] {W}{url} {G}{'(LOGIN PAGE?)' if suspicious else ''}{C}{auth_type}")
