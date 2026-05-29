@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import redirect_stdout
 from Dependencies.displays import isargsok, clear_screen, print_banner, help_menu, no_clean, M, W, R, Y, G, C, highlight, handle_error, init_env_file
 from Dependencies.url_parse import extract_domain, extract_strictdomain, extract_params
-from Dependencies.JWT.jwt_parser import analyze_jwt, print_jwt_analysis
+from Dependencies.JWT.jwt_parser import analyze_jwt, print_jwt_analysis, is_jwt
 from Dependencies.JWT.jwt_payload import JWTPlayground
 from Dependencies.CrawlURLS.wayback import wayback_urls
 from Dependencies.CrawlURLS.crawl import crawl_extractit
@@ -44,6 +44,9 @@ def process_target(args, target_url):
     # JWT Tokens
     # -------------------------
     if args.jwt:
+        if not is_jwt(args.jwt):
+            handle_error("Invalid JWT format", "ERROR")
+            return
         analyze_jwt(args.jwt)
         pg = JWTPlayground(args.jwt)
         tests = pg.generate()
