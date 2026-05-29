@@ -279,31 +279,9 @@ def process_target(args, target_url):
     if local_args.subdomains:
         if isargsok(local_args, "need_url"):
             extracted_domain = extract_strictdomain(local_args.url)
-            subs = get_subdomains(local_args, extracted_domain)
-            longest = max(len(item['subdomain']) for item in subs)
-            for item in subs:
-                if item.get("status") == "unreachable":
-                    continue
-                
-                asn_name = item["asn_name"].upper()
-                is_proxy = (
-                    is_reverse_proxy(item["asn_name"]) or
-                    asn_name in ["(VIRUSTOTAL)", "(CRT.SH)", "(PROBE)"]
-                )
-                
-                color = W if is_proxy else R
-                warn = ""
-                if item.get("status") == "ssl_error":
-                    warn = f"{Y} [SSL FAIL]"
-                elif item.get("suspicious"):
-                    warn = f"{Y} [REDIRECT CHAIN]"
+            get_subdomains(local_args, extracted_domain)
 
-                print(
-                    f"{G}[*] {Y}{item['subdomain']:<{longest}} → "
-                    f"{color}{item.get('status', item['ip'])} {W}{item['asn_name']}{warn}"
-                )
-
-
+    
     # -------------------------
     # Path traversal
     # -------------------------
