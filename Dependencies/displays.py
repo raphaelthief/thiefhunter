@@ -231,7 +231,7 @@ GENERAL OPTIONS
 
       Extracts:
           - emails
-          - phone numbers
+          - phone numbers (french numbers 06/07)
           - API keys
           - secrets
           - tokens
