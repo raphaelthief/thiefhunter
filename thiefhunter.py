@@ -21,6 +21,8 @@ from Dependencies.Audit.ssl_checks import ssl_that
 from Dependencies.crlf.crlf_headers import crlf_test
 from Dependencies.waf_detection.waf_detect import whatwaf
 from Dependencies.github_commits.commits import repos
+from Dependencies.TLD.tld_enum import tld_main
+from Dependencies.dir_enum.dir_files_scan import do_fuzz_paths
 
 
 def handle_exit(sig, frame):
@@ -49,6 +51,13 @@ def process_target(args, target_url):
             return
         analyze_jwt(args.jwt)
         pg = JWTPlayground(args.jwt)
+        
+        try:
+            pg = JWTPlayground(args.jwt)
+        except ValueError as e:
+            handle_error(e, "ERROR", args.verbose)
+            return
+        
         tests = pg.generate()
         for t in tests:
             print(f"{G}[*] {t.name}{W}")
@@ -268,12 +277,13 @@ def process_target(args, target_url):
             extracted_domain = extract_strictdomain(local_args.url)
             ssl_that(extracted_domain, local_args)
             ip = resolve_ip(local_args, extracted_domain)
-            ip_b64 = base64.b64encode(ip.encode("utf-8"))
-            print(f"{Y}\n[!] {G}Interesting urls to visit")
-            print(f" {G}- {W}https://www.shodan.io/host/{ip}")
-            print(f' {G}- {W}https://platform.censys.io/search?q=host.ip%3D"{ip}"')
-            print(f" {G}- {W}https://en.fofa.info/result?qbase64={ip_b64}%3D")
-            print(f" {G}- {W}https://www.virustotal.com/gui/ip-address/{ip}/details")
+            if ip:
+                ip_b64 = base64.b64encode(ip.encode("utf-8"))
+                print(f"{Y}\n[!] {G}Interesting urls to visit")
+                print(f" {G}- {W}https://www.shodan.io/host/{ip}")
+                print(f' {G}- {W}https://platform.censys.io/search?q=host.ip%3D"{ip}"')
+                print(f" {G}- {W}https://en.fofa.info/result?qbase64={ip_b64}%3D")
+                print(f" {G}- {W}https://www.virustotal.com/gui/ip-address/{ip}/details")
 
 
     # -------------------------
@@ -284,7 +294,15 @@ def process_target(args, target_url):
             extracted_domain = extract_strictdomain(local_args.url)
             get_subdomains(local_args, extracted_domain)
 
-    
+
+    # -------------------------
+    # Directory and files enum
+    # -------------------------
+    if local_args.dir:
+        if isargsok(local_args, "need_url"):
+            do_fuzz_paths(local_args)
+
+
     # -------------------------
     # Path traversal
     # -------------------------
@@ -341,6 +359,13 @@ def process_target(args, target_url):
             whatwaf(local_args)
 
 
+    # -------------------------
+    # TLD enum
+    # -------------------------
+    if local_args.tld:
+        if isargsok(local_args, "need_url"):
+            tld_main(local_args)
+
 
 
 
@@ -365,13 +390,16 @@ def main():
     parser.add_argument("--show-all", action="store_true", help="Show all URLs from --wayback (default = only URLs with parameters)")
     parser.add_argument("--wtf", type=int, help="Deep scan: extract emails, phones, secrets + robots.txt (--wtf 3)")
     parser.add_argument("--vln", "--vuln", dest="vuln", action="store_true", help="Detect vulnerable versions and associated CVE and exploits")
+    parser.add_argument("--dir", type=int, choices=[1, 2, 3, 4], default=1, help="Directory fuzzing level (1=Low 2=Moderate 3=Medium 4=High)")
     parser.add_argument("--exp", "--exploit-search", dest="exploit_search", help='Search exploit from technologie and version (--exploit-search "PHP 8.1" or --exploit-search CVE-2026-8838 or --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*)')
     parser.add_argument("--audit", action="store_true", help="Perform basic checks on missing headers and configurations")
     parser.add_argument("--sub", "--subdomains", dest="subdomains", action="store_true", help="Detect target subdomains (DNSDumpster, VirusTotal API key needed)")
+    parser.add_argument("--tld", action="store_true", help="Detect new dns extension target (target.to becoming target.cz for exemple")
     parser.add_argument("--trav", "--traversal", dest="traversal", action="store_true", help="Try path traversal on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
     parser.add_argument("--ord", "--open-redirect", dest="open_redirect", action="store_true", help="Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
     parser.add_argument("--crlf", action="store_true", help="Try to detect crlf injections")
     parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
+    parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
     parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>")
     
     args = parser.parse_args()
