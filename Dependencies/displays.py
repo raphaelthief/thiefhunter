@@ -262,6 +262,23 @@ GENERAL OPTIONS
           - If no token is provided, subdomain enumeration will rely only on crt.sh 
             and brute-force fuzzing using the tool's built-in subdomain wordlist.
 
+  {C}--dir{G}
+      Enumeration and testing of common directories and sensitive files
+      from the target domain root.
+
+      Levels:
+        1 - Low
+        2 - Moderate
+        3 - Medium
+        4 - High
+        
+        Higher levels increase the number of paths tested.
+
+      Default: 1
+
+  {C}--tld{G}
+      Enumerate a domain's DNS extensions to identify a related parent domain or detect the presence of clones
+
 
 {Y}VULNERABILITY ANALYSIS
 ───────────────────────────────────────────────────────────────────────{G}
@@ -350,6 +367,7 @@ GENERAL OPTIONS
           - classic traversal
           - encoded traversal
           - double encoded traversal
+          - double encoded traversal
           - mixed slash traversal
           - UTF-8 bypass payloads
           - NULL byte injections
@@ -412,6 +430,13 @@ GENERAL OPTIONS
           to correlate passwords leaked by the user, or from those leaks, identify a pattern in how 
           the person or the target’s technical teams create passwords
 
+
+{Y}AUTOMATION
+───────────────────────────────────────────────────────────────────────{G}
+  {C}--batch{G}
+      Automation of default user inputs. Script execution without any user interaction, for example 
+      by automatically handling prompts related to --traversal or --subdomains during successful 
+      tests that would normally ask whether the user wants to proceed further with the testing
 
 
 {Y}EXAMPLES
@@ -492,10 +517,10 @@ def handle_error(e, context=None, verbose=False):
         line = tb.lineno
         print(
             f"{prefix}{error_type}: {error_message} "
-            f"(file={filename}, line={line})"
+            f"(file={filename}, line={line}){W}"
         )
     else:
-        print(f"{prefix}{error_type}: {W}{error_message}")
+        print(f"{prefix}{error_type}: {W}{error_message}{W}")
 
 
 def init_env_file(args):
