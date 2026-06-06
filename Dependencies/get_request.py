@@ -3,7 +3,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 
-
 # =========================================================
 # DEFAUT & RANDOM HEADERS
 # =========================================================
@@ -165,20 +164,17 @@ def get_request(args, url, **kwargs):
         )
         return response
     except requests.exceptions.ConnectionError:
-        
         return None
-    except Exception as e:
-        handle_error(e, "Request error", args.verbose)
-        return None
+
     except requests.exceptions.ConnectTimeout:
         return None
 
     except requests.exceptions.ReadTimeout:
-        return None
+        return "timeout"
 
-    except requests.exceptions.ConnectionError:
+    except Exception as e:
+        handle_error(e, "Request error", args.verbose)
         return None
-
 
 
 # =========================================================
@@ -297,8 +293,7 @@ def get_request_socket(args, url, headers=None):
     except Exception as e:
         handle_error(e, "SOCKET Request error", args.verbose)
         return None
-
-
+        
 
 # =========================================================
 # RESOLVE DOMAIN IP
