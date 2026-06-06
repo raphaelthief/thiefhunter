@@ -1,4 +1,4 @@
-import requests, os, time
+import os, time
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
@@ -379,10 +379,18 @@ def get_subdomains(args, domain: str) -> list:
     # -------------------------
     # Ask user if they want HTTP access checks
     # -------------------------
-    check_access = input(f"\n{Y}[?] Do you want to test access to discovered subdomains? (y/n): {C}").strip().lower()
+    if args.batch:
+        print(f"\n{Y}[?] Do you want to test access to discovered subdomains? (y/n): {C}y")
+        check_access = "yes"
+    else:
+        check_access = input(f"\n{Y}[?] Do you want to test access to discovered subdomains? (y/n): {C}").strip().lower()
+        
     if check_access in ["y", "yes"]:
         print(f"{G}[+] Testing HTTP access on discovered subdomains ...")
         for entry in displayed_subdomains:
+            if entry.get("status") == 404:
+                continue
+                
             sub = entry["subdomain"]
 
             # -------------------------
