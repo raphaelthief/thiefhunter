@@ -276,6 +276,25 @@ GENERAL OPTIONS
 
       Default: 1
 
+  {C}--bypass-403{G}
+      Tests common 403/401 access control bypass techniques against the supplied URL.
+
+      Includes:
+        - Path normalization bypasses
+        - Encoded path variations
+        - Suffix and extension tricks
+        - Header-based bypasses
+        - Host and IP spoofing headers
+        - Reverse proxy misconfigurations
+
+      Results are classified by severity:
+        LOW     - Response differs from baseline
+        MEDIUM  - Redirects or authentication changes
+        HIGH    - Successful access (200/2xx)
+
+      Example:
+        --url https://target.com/admin --bypass-403
+
   {C}--tld{G}
       Enumerate a domain's DNS extensions to identify a related parent domain or detect the presence of clones
 
