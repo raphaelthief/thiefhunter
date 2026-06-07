@@ -23,6 +23,7 @@ from Dependencies.waf_detection.waf_detect import whatwaf
 from Dependencies.github_commits.commits import repos
 from Dependencies.TLD.tld_enum import tld_main
 from Dependencies.dir_enum.dir_files_scan import do_fuzz_paths
+from Dependencies.do403_bypass.fuzzer_403 import do_403
 
 
 def handle_exit(sig, frame):
@@ -304,6 +305,13 @@ def process_target(args, target_url):
 
 
     # -------------------------
+    # 403 bypass
+    # -------------------------
+    if local_args.bypass_403:
+        if isargsok(local_args, "need_url"):
+            do_403(local_args)
+
+    # -------------------------
     # Path traversal
     # -------------------------
     if local_args.traversal:
@@ -390,7 +398,7 @@ def main():
     parser.add_argument("--show-all", action="store_true", help="Show all URLs from --wayback (default = only URLs with parameters)")
     parser.add_argument("--wtf", type=int, help="Deep scan: extract emails, phones, secrets + robots.txt (--wtf 3)")
     parser.add_argument("--vln", "--vuln", dest="vuln", action="store_true", help="Detect vulnerable versions and associated CVE and exploits")
-    parser.add_argument("--dir", type=int, choices=[1, 2, 3, 4], default=1, help="Directory fuzzing level (1=Low 2=Moderate 3=Medium 4=High)")
+    parser.add_argument("--dir", type=int, choices=[1, 2, 3, 4], default=None, help="Directory fuzzing level (1=Low 2=Moderate 3=Medium 4=High)")
     parser.add_argument("--exp", "--exploit-search", dest="exploit_search", help='Search exploit from technologie and version (--exploit-search "PHP 8.1" or --exploit-search CVE-2026-8838 or --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*)')
     parser.add_argument("--audit", action="store_true", help="Perform basic checks on missing headers and configurations")
     parser.add_argument("--sub", "--subdomains", dest="subdomains", action="store_true", help="Detect target subdomains (DNSDumpster, VirusTotal API key needed)")
@@ -399,6 +407,7 @@ def main():
     parser.add_argument("--ord", "--open-redirect", dest="open_redirect", action="store_true", help="Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
     parser.add_argument("--crlf", action="store_true", help="Try to detect crlf injections")
     parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
+    parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
     parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>")
     
