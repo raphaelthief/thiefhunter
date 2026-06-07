@@ -228,6 +228,29 @@ def worker(args, base_url, path, baseline):
         handle_error(e, "ERROR", args.verbose)
 
 
+
+def get_robots_paths(args, base_url):
+    paths = []
+    try:
+        robots_url = urljoin(base_url, "/robots.txt")
+        response = get_request(args, robots_url, timeout=10, redirect=False)
+        if (response and response != "timeout" and response.status_code == 200):
+            print(f"{G}[*]{W} robots.txt found")
+            for line in response.text.splitlines():
+                line = line.strip()
+                if (not line or line.startswith("#")):
+                    continue
+
+                if line.lower().startswith("disallow:"):
+                    path = line.split(":", 1)[1].strip()
+                    if not path or path == "/":
+                        continue
+                    paths.append(path)
+    except Exception as e:
+        handle_error(e, "ERROR", args.verbose)
+    return list(dict.fromkeys(paths))
+
+
 def do_fuzz_paths(args):
     try:
         # 1. Parse Base URL
@@ -280,7 +303,24 @@ def do_fuzz_paths(args):
         baseline = get_baseline(args, base_url)
         print(f"{G}[*]{W} Baseline detected -> Status: {baseline[0]}, Length: {baseline[1]}, Words: {baseline[2]}")
 
-        # 4. Execute Thread Pool
+
+        # 4. Check robots.txt Disallow
+        print(f"{G}[*]{W} Checking robots.txt...")
+        robots_paths = get_robots_paths(args, base_url)
+        if robots_paths:
+            print(f"{G}[*]{W} Found {len(robots_paths)} paths in robots.txt")
+            skipped = 0
+            for path in robots_paths:
+                if "*" in path:
+                    skipped += 1
+                    continue
+                worker(args, base_url, path, baseline)
+
+            if skipped:
+                print(f"{Y}[!]{W} Skipped {skipped} robots.txt entries containing '*'")
+
+
+        # 5. Execute Thread Pool
         with ThreadPoolExecutor(max_workers=25) as executor:
             futures = [executor.submit(worker, args, base_url, path, baseline) for path in paths]
             for future in tqdm(
@@ -292,7 +332,7 @@ def do_fuzz_paths(args):
             ):
                 future.result()
         
-        # 5. Process .listing enum
+        # 6. Process .listing enum
         if discovered_listings:
             print(f"\n{R}[!]{W} {len(discovered_listings)} directory listing(s) found:")
             for listing in discovered_listings:
