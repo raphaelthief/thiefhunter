@@ -320,6 +320,9 @@ def do_fuzz_paths(args):
             if skipped:
                 print(f"{Y}[!]{W} Skipped {skipped} robots.txt entries containing '*'")
 
+        
+        # Special wordpress enum
+        worker(args, base_url, f"wp-json/oembed/1.0/embed?url={base_url}", baseline)
 
         # 5. Execute Thread Pool
         with ThreadPoolExecutor(max_workers=25) as executor:
