@@ -11,6 +11,7 @@ WORDLISTS = {
     "admin_logins.txt": 1,
     "indexoff.txt": 1,
     "sensitive_files.txt": 1,
+    "wordpress.txt": 1,
 
     "api_endpoints.txt": 2,
     
@@ -31,7 +32,7 @@ def crawl_directory_listing(args, listing_url, visited=None, depth=0):
         return
 
     visited.add(listing_url)
-    response = get_request(args, listing_url, timeout=10, redirect=False)
+    response = get_request(args, listing_url, timeout=30, redirect=False)
 
     if not response or response == "timeout":
         return
@@ -79,7 +80,7 @@ def crawl_directory_listing(args, listing_url, visited=None, depth=0):
         # DIRECTORY
         elif entry_type == "d":
             next_listing = urljoin(base_dir, f"{name}/.listing")
-            listing_response = get_request(args, next_listing, timeout=10, redirect=False)
+            listing_response = get_request(args, next_listing, timeout=30, redirect=False)
             if listing_response and listing_response != "timeout":
                 status = listing_response.status_code
             else:
@@ -103,7 +104,7 @@ def get_baseline(args, base_url):
     random_path = get_random_path()
     target = urljoin(base_url, random_path)
     try:
-        response = get_request(args, target, timeout=10, redirect=False)
+        response = get_request(args, target, timeout=30, redirect=False)
         if response is not None:
             return (response.status_code, len(response.text), len(response.text.split()))
     except Exception as e:
@@ -185,7 +186,7 @@ def worker(args, base_url, path, baseline):
                 return
             tested_listings.add(target)
             
-        response = get_request(args, target, timeout=10, redirect=False)
+        response = get_request(args, target, timeout=30, redirect=False)
         if response is None:
             return
 
@@ -233,7 +234,7 @@ def get_robots_paths(args, base_url):
     paths = []
     try:
         robots_url = urljoin(base_url, "/robots.txt")
-        response = get_request(args, robots_url, timeout=10, redirect=False)
+        response = get_request(args, robots_url, timeout=30, redirect=False)
         if (response and response != "timeout" and response.status_code == 200):
             print(f"{G}[*]{W} robots.txt found")
             for line in response.text.splitlines():
