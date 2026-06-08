@@ -249,7 +249,6 @@ doc
 docs
 graphql
 swagger/
-swagger.json
 swagger-resources
 swagger/v1/swagger.json
 v1/

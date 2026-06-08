@@ -50,9 +50,6 @@ console/login
 portal/login
 staff/login
 internal/login
-wp-admin
-wp-login.php
-administrator
 user/login
 admin.php
 login.php

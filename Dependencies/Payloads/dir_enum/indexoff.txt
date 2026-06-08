@@ -99,7 +99,6 @@ inventory/
 exports_old/
 archive_old/
 backup_old/
-backup-old/
 backup.bak/
 site.bak/
 www.bak/

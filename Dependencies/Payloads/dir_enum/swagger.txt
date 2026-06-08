@@ -6,7 +6,6 @@ _wadl
 _wadl/internal
 _wadl/system
 api
-api-docs
 api-docs.html
 api-docs.json
 api-docs/
@@ -146,7 +145,6 @@ api-docs/v1/index/
 api-docs/v1/index/index.html
 api-docs/v1/openapi
 api-docs/v1/openapi.html
-api-docs/v1/openapi.json
 api-docs/v1/openapi/
 api-docs/v1/openapi/index.html
 api-docs/v1/swagger
@@ -313,8 +311,6 @@ api.v2/application.wadl
 api.v2/internal/application.wadl
 api.v2/system/application.wadl
 api/
-api/api
-api/api-docs
 api/api-docs.html
 api/api-docs.json
 api/api-docs/
@@ -324,7 +320,6 @@ api/api-merged.json
 api/api-merged/
 api/api.json
 api/api/
-api/apidocs
 api/apidocs.html
 api/apidocs.json
 api/apidocs/
@@ -339,16 +334,13 @@ api/apispec_1.html
 api/apispec_1.json
 api/apispec_1/
 api/apispec_1/index.html
-api/application.wadl
 api/doc
 api/doc.html
 api/doc.json
 api/doc/
 api/doc/index.html
-api/docs
 api/docs.html
 api/docs.json
-api/docs/
 api/docs/index.html
 api/documentation
 api/documentation.html
@@ -366,7 +358,6 @@ api/graphiql
 api/graphiql/internal
 api/graphiql/system
 api/graphiql/v1
-api/graphql
 api/graphql/
 api/graphql/internal
 api/graphql/schema
@@ -405,7 +396,6 @@ api/openapi/v2.yaml
 api/openapi/v3
 api/openapi/v3.json
 api/openapi/v3.yaml
-api/swagger
 api/swagger-config
 api/swagger-config.html
 api/swagger-config.json
@@ -439,9 +429,7 @@ api/swagger-ui/
 api/swagger-ui/index.html
 api/swagger-ui/index.js
 api/swagger.html
-api/swagger.json
 api/swagger/
-api/swagger/index.html
 api/system.wadl
 api/system/application.wadl
 api/system/graphql
@@ -507,7 +495,6 @@ api/v1/gateway/swagger
 api/v1/gateway/swagger-ui
 api/v1/gateway/swagger-ui.html
 api/v1/gateway/swagger.html
-api/v1/graphql
 api/v1/index
 api/v1/index.json
 api/v1/index/
@@ -552,7 +539,6 @@ api/v1/swagger-ui.min.js
 api/v1/swagger-ui/
 api/v1/swagger-ui/index.html
 api/v1/swagger.html
-api/v1/swagger.json
 api/v1/swagger/
 api/v1/swagger/index.html
 api/v1/system.wadl
@@ -679,7 +665,6 @@ api/v2/swagger-ui.min.js
 api/v2/swagger-ui/
 api/v2/swagger-ui/index.html
 api/v2/swagger.html
-api/v2/swagger.json
 api/v2/swagger/
 api/v2/swagger/index.html
 api/v2/system.wadl
@@ -822,7 +807,6 @@ api/v4/swagger-ui.html
 api/v4/swagger.html
 apidoc
 apidoc.html
-apidocs
 apidocs.html
 apidocs.json
 apidocs/
@@ -934,7 +918,6 @@ apispec_1.html
 apispec_1.json
 apispec_1/
 apispec_1/index.html
-application.wadl
 application.wadl.xml
 application.wadl?detail=true
 application.wadl?format=xml
@@ -945,7 +928,6 @@ dev/v1/graphql
 developer/docs
 developer/docs.html
 developers
-doc
 doc.html
 doc.json
 doc/
@@ -1047,10 +1029,8 @@ doc/v3
 doc/v3.json
 doc/v3/
 doc/v3/index.html
-docs
 docs.html
 docs.json
-docs/
 docs/api
 docs/api-docs
 docs/api-docs.html
@@ -2070,7 +2050,6 @@ graphiql
 graphiql/index.html
 graphiql/internal
 graphiql/system
-graphql
 graphql-api
 graphql-browser
 graphql-browser/internal
@@ -2175,7 +2154,6 @@ openapi/v3.json
 openapi/v3.yaml
 public
 public.json
-public/
 public/api
 public/api-docs
 public/api-docs.html
@@ -2410,7 +2388,6 @@ swagger-config.json
 swagger-config/
 swagger-config/index
 swagger-config/index.html
-swagger-resources
 swagger-resources.html
 swagger-resources.json
 swagger-resources/
@@ -2542,7 +2519,6 @@ swagger.json/
 swagger.yaml
 swagger.yaml/
 swagger.yml
-swagger/
 swagger/api
 swagger/api-docs
 swagger/api-docs.html
@@ -3120,7 +3096,6 @@ swagger/v1/swagger-ui.min.js
 swagger/v1/swagger-ui/
 swagger/v1/swagger-ui/index.html
 swagger/v1/swagger.html
-swagger/v1/swagger.json
 swagger/v1/swagger/
 swagger/v1/swagger/index.html
 swagger/v1/v1
@@ -3341,7 +3316,6 @@ system/application.wadl
 system/application.wadl.xml
 v1
 v1.json
-v1/
 v1/api
 v1/api-docs
 v1/api-docs.html
@@ -3411,7 +3385,6 @@ v1/docs/
 v1/docs/index.html
 v1/documentation
 v1/documentation.html
-v1/graphql
 v1/index
 v1/index.json
 v1/index/
@@ -3472,9 +3445,7 @@ v1/v2/
 v1/v3
 v1/v3.json
 v1/v3/
-v2
 v2.json
-v2/
 v2/api
 v2/api-docs
 v2/api-docs.html
