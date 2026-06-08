@@ -117,6 +117,8 @@ wp-content/uploads/backup.zip
 wp-cron.php
 wp-db.sql
 wp-feed.php
+feed
+feed/atom/
 wp-includes/
 wp-includes/Requests/Transport/cURL.php
 wp-includes/js/tinymce/
