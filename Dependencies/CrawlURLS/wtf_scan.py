@@ -1,4 +1,4 @@
-import re, tldextract
+import re, tldextract, base64
 from urllib.parse import urljoin, urlparse
 from Dependencies.displays import M, W, R, Y, G, C
 from Dependencies.get_request import get_request
@@ -409,6 +409,43 @@ SENSITIVE_KEYWORDS = [
     "download", "file", "files",
 ]
 
+
+def is_probably_base64(s):
+    if len(s) < 15:
+        return False
+    if len(s) % 4 != 0:
+        return False
+    return re.fullmatch(r'[A-Za-z0-9+/=]+', s) is not None
+
+
+def try_decode_base64(s):
+    try:
+        return base64.b64decode(s, validate=True)
+    except Exception:
+        return None
+
+
+def extract_base64(text):
+    results = []
+    chunks = re.split(r'[^A-Za-z0-9+/=]+', text)
+    for chunk in chunks:
+        if not is_probably_base64(chunk):
+            continue
+
+        decoded = try_decode_base64(chunk)
+        if not decoded:
+            continue
+
+        if len(decoded) < 15:
+            continue
+
+        try:
+            results.append(decoded.decode("utf-8"))
+        except UnicodeDecodeError:
+            pass
+    return results
+
+
 def is_valid_email(email):
     local, domain = email.rsplit("@", 1)
 
@@ -542,7 +579,8 @@ def wtf_scan(start_url, args, max_depth=2):
     found_sensitive_keywords = {}
     found_sensitive_urls = set()
     found_subdomains = set()
-
+    found_base64 = set()
+    
     ext = tldextract.extract(args.url)
     base_domain = f"{ext.domain}.{ext.suffix}"
     
@@ -560,12 +598,22 @@ def wtf_scan(start_url, args, max_depth=2):
             current_domain = urlparse(url).netloc
             if current_domain.endswith(base_domain):
                 found_subdomains.add(current_domain)
+            
+            # 0. headers b64 scan
+            for k, v in res.headers.items():
+                if isinstance(v, str):
+                    for decoded in extract_base64(v):
+                        found_base64.add(decoded)
 
             # 1. HTML scan
             emails, phones, secrets = extract_from_text(text)
             found_emails.update(emails)
             found_phones.update(phones)
             found_secrets.update(secrets)
+            b64_decoded = extract_base64(text)
+            for item in b64_decoded:
+                found_base64.add(item)
+
 
             # 2. JS scan
             for script in extract_js(text):
@@ -573,6 +621,9 @@ def wtf_scan(start_url, args, max_depth=2):
                 found_emails.update(e)
                 found_phones.update(p)
                 found_secrets.update(s)
+                for item in extract_base64(script):
+                    found_base64.add(item)
+
 
             # 3. API scan
             apis = extract_api_endpoints(text)
@@ -634,4 +685,5 @@ def wtf_scan(start_url, args, max_depth=2):
         "sensitive_keywords": found_sensitive_keywords,
         "sensitive_urls": sorted(found_sensitive_urls),
         "subdomains": sorted(found_subdomains),
+        "base64": sorted(found_base64),
     }
