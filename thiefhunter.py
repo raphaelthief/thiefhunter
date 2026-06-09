@@ -193,6 +193,12 @@ def process_target(args, target_url):
                         print(f"{G}    - {W}{r}")
                 print()
 
+            if data.get("base64"):
+                print(f"{G}[+] BASE64 decoded content")
+                for b in data["base64"]:
+                    print(f"{G}    - {W}{b}")
+                print()
+
             if not any(data.values()):
                 print(f"{R}[-] Nothing found")
 
