@@ -226,7 +226,7 @@ def get_random_path(length=12):
 def build_baselines(args):
     baselines = {}
     try:
-        r = get_request(args, args.url, timeout=10, redirect=False)
+        r = get_request(args, args.url, timeout=10, allow_redirects=False)
         if r is not None:
             baselines["target"] = {
                 "status": r.status_code,
@@ -238,7 +238,7 @@ def build_baselines(args):
 
         # Home page
         home_url = f"{parsed.scheme}://{parsed.netloc}/"
-        r = get_request(args, home_url, timeout=10, redirect=False)
+        r = get_request(args, home_url, timeout=10, allow_redirects=False)
         if r is not None:
             baselines["home"] = {
                 "status": r.status_code,
@@ -250,7 +250,7 @@ def build_baselines(args):
             get_random_path(20)
         )
 
-        r = get_request(args, random_url, timeout=10, redirect=False)
+        r = get_request(args, random_url, timeout=10, allow_redirects=False)
         if r is not None:
             baselines["notfound"] = {
                 "status": r.status_code,
@@ -364,7 +364,7 @@ def do_403(args):
     for payload in payloads:
         try:
             target_url = build_url(args.url, payload)
-            response = get_request(args, target_url, timeout=10, redirect=False)
+            response = get_request(args, target_url, timeout=10, allow_redirects=False)
             if response is None:
                 continue
             
@@ -403,7 +403,7 @@ def do_403(args):
             for k, v in header_set.items():
                 headers[k] = v.format(path=protected_path)
 
-            response = get_request(args, args.url, headers=headers, timeout=10, redirect=False)
+            response = get_request(args, args.url, headers=headers, timeout=10, allow_redirects=False)
             if response is None:
                 continue
 
