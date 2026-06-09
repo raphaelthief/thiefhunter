@@ -414,6 +414,11 @@ def get_subdomains(args, domain: str) -> list:
                 print(f"{W}[NO RESPONSE] {url}")
                 continue
 
+            if response == "timeout":
+                print(f"{W}[TIMEOUT] {url}")
+                continue
+
+
             suspicious = False
             title = response.text.lower()
             headers = response.headers
