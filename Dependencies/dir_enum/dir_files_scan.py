@@ -32,7 +32,7 @@ def crawl_directory_listing(args, listing_url, visited=None, depth=0):
         return
 
     visited.add(listing_url)
-    response = get_request(args, listing_url, timeout=30, redirect=False)
+    response = get_request(args, listing_url, timeout=30, allow_redirects=False)
 
     if not response or response == "timeout":
         return
@@ -63,12 +63,7 @@ def crawl_directory_listing(args, listing_url, visited=None, depth=0):
         # FILE
         if entry_type == "-":
             file_url = urljoin(base_dir, name)
-            file_response = get_request(
-                args,
-                file_url,
-                timeout=10,
-                redirect=False
-            )
+            file_response = get_request(args, file_url, timeout=30, allow_redirects=False)
 
             if file_response and file_response != "timeout":
                 status = f"{R}{file_response.status_code}"
@@ -80,7 +75,7 @@ def crawl_directory_listing(args, listing_url, visited=None, depth=0):
         # DIRECTORY
         elif entry_type == "d":
             next_listing = urljoin(base_dir, f"{name}/.listing")
-            listing_response = get_request(args, next_listing, timeout=30, redirect=False)
+            listing_response = get_request(args, next_listing, timeout=30, allow_redirects=False)
             if listing_response and listing_response != "timeout":
                 status = listing_response.status_code
             else:
@@ -104,7 +99,7 @@ def get_baseline(args, base_url):
     random_path = get_random_path()
     target = urljoin(base_url, random_path)
     try:
-        response = get_request(args, target, timeout=30, redirect=False)
+        response = get_request(args, target, timeout=30, allow_redirects=False)
         if response is not None:
             return (response.status_code, len(response.text), len(response.text.split()))
     except Exception as e:
@@ -186,7 +181,7 @@ def worker(args, base_url, path, baseline):
                 return
             tested_listings.add(target)
             
-        response = get_request(args, target, timeout=30, redirect=False)
+        response = get_request(args, target, timeout=30, allow_redirects=False)
         if response is None:
             return
 
@@ -234,7 +229,7 @@ def get_robots_paths(args, base_url):
     paths = []
     try:
         robots_url = urljoin(base_url, "/robots.txt")
-        response = get_request(args, robots_url, timeout=30, redirect=False)
+        response = get_request(args, robots_url, timeout=30, allow_redirects=False)
         if (response and response != "timeout" and response.status_code == 200):
             print(f"{G}[*]{W} robots.txt found")
             for line in response.text.splitlines():
@@ -302,7 +297,7 @@ def do_fuzz_paths(args):
         # 3. Calculate Baseline (Soft 404 Detection)
         print(f"{G}[*]{W} Calculating baseline (soft 404 detection)...")
         baseline = get_baseline(args, base_url)
-        print(f"{G}[*]{W} Baseline detected -> Status: {baseline[0]}, Length: {baseline[1]}, Words: {baseline[2]}")
+        print(f"{G}[*]{W} Baseline detected -> Status: {Y}{baseline[0]}{W}, Length: {Y}{baseline[1]}{W}, Words: {Y}{baseline[2]}")
 
 
         # 4. Check robots.txt Disallow
