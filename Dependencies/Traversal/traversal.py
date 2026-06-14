@@ -8,6 +8,7 @@ from threading import Lock
 from urllib.parse import urlparse, urljoin, urlunsplit
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.get_request import get_request
+from Dependencies.save_output import add_result
 
 from Dependencies.Payloads.Traversal.linux.traversals_1_encoded import traversals_1_encoded
 from Dependencies.Payloads.Traversal.linux.traversals_2_encoded import traversals_2_encoded
@@ -227,7 +228,6 @@ def is_crawlable(url):
 
 
 def crawl_extract(args, start_url, max_depth=2, workers=25):
-
     q = Queue()
     q.put((start_url, 0))
 
@@ -245,9 +245,7 @@ def crawl_extract(args, start_url, max_depth=2, workers=25):
     # INIT DOMAIN
     # =========================================================
     try:
-
         res = get_request(args, start_url)
-
         allowed_domains.add(
             normalize_netloc(
                 urlparse(start_url).netloc
@@ -255,28 +253,17 @@ def crawl_extract(args, start_url, max_depth=2, workers=25):
         )
 
         if res is not None:
-
             allowed_domains.add(
                 normalize_netloc(
                     urlparse(res.url).netloc
                 )
             )
-
     except Exception as e:
-
-        handle_error(
-            e,
-            "INIT ERROR",
-            args.verbose
-        )
-
+        handle_error(e, "INIT ERROR", args.verbose)
         return {}
 
     if args.verbose:
-        print(
-            f"{G}[+] {W}Allowed domains: "
-            f"{allowed_domains}"
-        )
+        print(f"{G}[+] {W}Allowed domains: {allowed_domains}")
 
     # =========================================================
     # WORKER
@@ -296,8 +283,9 @@ def crawl_extract(args, start_url, max_depth=2, workers=25):
                 with seen_lock:
                     if url in seen:
                         continue
-
+                        
                     seen.add(url)
+                    
                 parsed = urlparse(url)
 
                 # =================================================
@@ -349,43 +337,23 @@ def crawl_extract(args, start_url, max_depth=2, workers=25):
                 # REQUEST
                 # =================================================
                 try:
-                    res = get_request(
-                        args,
-                        url
-                    )
+                    res = get_request(args, url)
                 except Exception as e:
-                    handle_error(
-                        e,
-                        "REQUEST ERROR",
-                        args.verbose
-                    )
+                    handle_error(e, "REQUEST ERROR", args.verbose)
                     continue
 
                 if res is None:
                     if args.verbose:
-                        print(
-                            f"{R}[NULL RESPONSE]{W} "
-                            f"{url}"
-                        )
+                        print(f"{R}[NULL RESPONSE]{W} {url}")
                     continue
 
                 if args.verbose:
-                    print(
-                        f"{Y}[HTTP]{W} "
-                        f"{res.status_code} "
-                        f"(DEPTH={depth}) -> {url}"
-                    )
+                    print(f"{Y}[HTTP]{W} {res.status_code} (DEPTH={depth}) -> {url}")
 
                 if res.status_code >= 500:
                     continue
 
-                content_type = (
-                    res.headers.get(
-                        "Content-Type",
-                        ""
-                    )
-                    .lower()
-                )
+                content_type = (res.headers.get("Content-Type", "").lower())
 
                 if "text/html" not in content_type:
                     continue
@@ -393,17 +361,18 @@ def crawl_extract(args, start_url, max_depth=2, workers=25):
                 with visited_lock:
                     visited.add(url)
 
-                soup = BeautifulSoup(
-                    res.text,
-                    "html.parser"
-                )
+                soup = BeautifulSoup(res.text, "html.parser")
 
                 # =================================================
                 # LINK EXTRACTION
                 # =================================================
                 for tag, attr in (
                     ("a", "href"),
-                    ("form", "action")
+                    ("form", "action"),
+                    ("img", "src"),
+                    ("script", "src"),
+                    ("iframe", "src"),
+                    ("source", "src")
                 ):
 
                     for el in soup.find_all(tag):
@@ -430,10 +399,7 @@ def crawl_extract(args, start_url, max_depth=2, workers=25):
                             continue
 
                         parsed_link = urlparse(full)
-                        if not is_allowed_domain(
-                            parsed_link.netloc,
-                            allowed_domains
-                        ):
+                        if not is_allowed_domain(parsed_link.netloc, allowed_domains):
                             continue
 
                         # ============================
@@ -462,9 +428,31 @@ def crawl_extract(args, start_url, max_depth=2, workers=25):
             executor.submit(worker)
         q.join()
 
+    if args.save:
+        add_result("Path_Traversal", {
+            "Type": "Crawl_Summary",
+            "data": {
+                "pages": len(visited),
+                "endpoints": len(results),
+                "allowed_domains": list(allowed_domains)
+            }
+        })
+
     print(f"\n{G}[+] Crawl finished")
     print(f"{G}[+] {W}Pages: {len(visited)}")
     print(f"{G}[+] {W}Endpoints: {len(results)}\n")
+    
+    if args.save:
+        for base, data in results.items():
+            add_result("Path_Traversal", {
+                "Type": "Endpoint_Discovered",
+                "data": {
+                    "endpoint": base,
+                    "params": list(data["params"]),
+                    "suspicious": data["suspicious"],
+                    "examples": data["examples"]
+                }
+            })
     return results
 
 # ----------------------------
@@ -539,6 +527,17 @@ def gimelove(args, base_url, success_payload, extension: str, param_name: str, c
 
             if r.status_code == 200:
                 results_200.append((url, r.text))
+                
+                if args.save:
+                    add_result("Path_Traversal", {
+                        "Type": "File_Disclosure",
+                        "data": {
+                            "url": url,
+                            "status": r.status_code,
+                            "content_length": len(r.text),
+                            "content": r.text
+                        }
+                    })
         except Exception as e:
             handle_error(e, "ERROR", args.verbose)
 
@@ -553,8 +552,30 @@ def gimelove(args, base_url, success_payload, extension: str, param_name: str, c
 
             if r.status_code == 200:
                 results_200.append((url, r.text))
+                
+                if args.save:
+                    add_result("Path_Traversal", {
+                        "Type": "File_Disclosure",
+                        "data": {
+                            "url": url,
+                            "status": r.status_code,
+                            "content_length": len(r.text),
+                            "content": r.text
+                        }
+                    })
         except Exception as e:
             handle_error(e, "ERROR", args.verbose)
+
+    if args.save:
+        add_result("Path_Traversal", {
+            "Type": "Enumeration_Summary",
+            "data": {
+                "files_found": len(results_200),
+                "successful_urls": [
+                    u for u, _ in results_200
+                ]
+            }
+        })
 
     print(f"\n{C}[+] Responses with HTTP 200:\n")
     for url, content in results_200:
@@ -568,6 +589,17 @@ def gimelove(args, base_url, success_payload, extension: str, param_name: str, c
 # ----------------------------
 def test_traversal(args, base_url, param, os_type):
     payloads = build_payloads(os_type)
+    
+    if args.save:
+        add_result("Path_Traversal", {
+            "Type": "Parameter_Tested",
+            "data": {
+                "url": base_url,
+                "parameter": param,
+                "os_type": os_type
+            }
+        })
+        
     if not os_type == "windows":
         context = extract_endpoint_context(base_url)
         if context is not None:
@@ -600,6 +632,18 @@ def test_traversal(args, base_url, param, os_type):
         r = get_request(args, url)
         if is_vulnerable(r.text, clean_base):
             print(f"{R}[VULNERABLE] {W}{url}")
+            
+            if args.save:
+                add_result("Path_Traversal", {
+                    "Type": "Traversal_Vulnerability",
+                    "data": {
+                        "url": url,
+                        "parameter": param,
+                        "payload": payload,
+                        "os_type": os_type
+                    }
+                })
+    
             if args.batch:
                 print(f"\n{Y}[?] Enum existing files? (y/n): {C}y")
                 gimelove(args, clean_base, payload, ext, param, context)
@@ -608,6 +652,8 @@ def test_traversal(args, base_url, param, os_type):
                 user_input = input(f"\n{Y}[?] Enum existing files? (y/n): {C}").strip().lower()
                 if user_input in ("y", "yes"):
                     gimelove(args, clean_base, payload, ext, param, context)
+                    break
+                elif user_input in ("n", "no"):
                     break
                 else:
                     handle_error("Invalid user input", "ERROR", args.verbose)
