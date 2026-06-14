@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from Dependencies.get_request import get_request
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
+from Dependencies.save_output import add_result
 
 WAF_STRONG_CODES = {406, 419, 429, 525, 1020}
 
@@ -320,14 +321,27 @@ def whatwaf(args):
     try:
         print(f"\n{C}[+] WAF detection")
         response = get_request(args, args.url)
-        wafs = detect_waf(
-            response,
-            args,
-            verbose=getattr(args, "verbose", False)
-        )
+        wafs = detect_waf(response, args, verbose=getattr(args, "verbose", False))
+
+        if args.save and response:
+            add_result("WAF_Detection", {
+                "Type": "Baseline",
+                "data": {
+                    "url": args.url,
+                    "status": response.status_code,
+                    "headers": dict(response.headers)
+                }
+            })
 
         if not wafs:
             print(f"{R}[-] No WAF detected")
+            if args.save:
+                add_result("WAF_Detection", {
+                    "Type": "No_WAF_Detected",
+                    "data": {
+                        "url": args.url
+                    }
+                })
             return
 
         print(f"{G}[+] {W}Detected WAF(s):")
@@ -341,5 +355,34 @@ def whatwaf(args):
                 print(f"     {G}↳ {W}evidence:")
                 for k, v in evidence.items():
                     print(f"        {G}- {Y}{k}{W}: {highlight(v)}")
+
+            if args.save:
+                add_result("WAF_Detection", {
+                    "Type": "WAF_Detected",
+                    "data": {
+                        "name": w["waf"],
+                        "confidence": w["confidence"],
+                        "sources": w.get("sources", []),
+                        "score": w.get("score"),
+                        "max_score": w.get("max_score"),
+                        "breakdown": w.get("breakdown", {}),
+                        "evidence": w.get("evidence", {})
+                    }
+                })
+        if args.save:
+            add_result("WAF_Detection", {
+                "Type": "Summary",
+                "data": {
+                    "url": args.url,
+                    "count": len(wafs),
+                    "wafs": [
+                        {
+                            "name": w["waf"],
+                            "confidence": w["confidence"]
+                        }
+                        for w in wafs
+                    ]
+                }
+            })
     except Exception as e:
         handle_error(e, "Error during WAF detection", args.verbose)
