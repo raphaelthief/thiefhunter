@@ -2,7 +2,7 @@ import random, string
 from urllib.parse import urlparse, urljoin
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.get_request import get_request
-
+from Dependencies.save_output import add_result
 
 PAYLOAD_TEMPLATES = [
     "/{p}",
@@ -353,6 +353,16 @@ def do_403(args):
     print(f"{G}[*] HOME    :{W}", baselines.get("home"))
     print(f"{G}[*] 404     :{W}", baselines.get("notfound"))
 
+    if args.save:
+        add_result("403_Bypass", {
+            "Type": "Baseline",
+            "data": {
+                "target": baselines.get("target"),
+                "home": baselines.get("home"),
+                "notfound": baselines.get("notfound")
+            }
+        })
+
     target = baselines.get("target")
     if not target:
         print(f"{R}[!] Unable to build baseline")
@@ -384,14 +394,18 @@ def do_403(args):
             print(f"{color}[{tag}] {W}{len(response.text):<8} {target_url}")
             severity = classify_response(response, baselines)
             if severity:
-                findings.append(
-                    (
-                        severity,
-                        response.status_code,
-                        len(response.text),
-                        target_url
-                    )
-                )
+                finding = {
+                    "severity": severity,
+                    "status": response.status_code,
+                    "length": len(response.text),
+                    "payload": target_url
+                }
+                findings.append(finding)
+                if args.save:
+                    add_result("403_Bypass", {
+                        "Type": "URL_Bypass",
+                        "data": finding
+                    })
         except Exception as e:
             handle_error(e, "ERROR", args.verbose)
 
@@ -431,20 +445,40 @@ def do_403(args):
 
             severity = classify_response(response, baselines)
             if severity:
-                findings.append(
-                    (
-                        severity,
-                        response.status_code,
-                        len(response.text),
-                        header_set
-                    )
-                )
+                finding = {
+                    "severity": severity,
+                    "status": response.status_code,
+                    "length": len(response.text),
+                    "headers": header_set
+                }
+
+                findings.append(finding)
+
+                if args.save:
+                    add_result("403_Bypass", {
+                        "Type": "Header_Bypass",
+                        "data": finding
+                    })
         except Exception as e:
             handle_error(e, "ERROR", args.verbose)
 
     print(f"\n{G}[+] Interesting findings: {Y}{len(findings)}")
-
-    for severity, status, length, payload in findings:
-        color = R if severity == "HIGH" else Y
-        print(f"{color}[{severity}] {W}[{status}] {length:<8} {payload}")
+    if args.save:
+        add_result("403_Bypass", {
+            "Type": "Summary",
+            "data": {
+                "target": args.url,
+                "payloads_tested": len(payloads),
+                "header_bypasses_tested": len(HEADER_BYPASSES),
+                "findings": len(findings)
+            }
+        })
+    for finding in findings:
+        color = R if finding["severity"] == "HIGH" else Y
+        print(
+            f"{color}[{finding['severity']}] {W}"
+            f"[{finding['status']}] "
+            f"{finding['length']:<8} "
+            f"{finding.get('payload') or finding.get('headers')}"
+        )
 
