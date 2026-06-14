@@ -4,7 +4,7 @@ from collections import Counter
 from urllib.parse import urljoin, urlparse
 from webtech import WebTech
 from webtech.utils import WrongContentTypeException
-from wappalyzer import analyze
+from wappalyzer import Wappalyzer
 from packaging import version
 from Dependencies.Versions_detection.wordpress import detect_wordpress
 from Dependencies.get_request import get_request
@@ -28,11 +28,12 @@ def webtech_scan(url):
 
 
 def wappalyze_that(url, cookies=None):
-    return analyze(
-        url=url,
-        scan_type='balanced',
-        cookie=cookies
-    )
+    try:
+        with Wappalyzer(workers=1, timeout=30) as scanner:
+            return scanner.analyze(url)
+    except Exception:
+        return {}
+
 
 def format_webtech(result):
     lines = result.split("\n")
@@ -52,10 +53,23 @@ def format_webtech(result):
 
 def format_wappalyzer(result):
     techs = []
-    for url, data in result.items():
-        for tech, info in data.items():
-            version = info.get("version", "")
+
+    if not result:
+        return techs
+
+    # case analyze_many()
+    if isinstance(result, dict) and any(isinstance(v, dict) for v in result.values()):
+        for url, data in result.items():
+            for tech, info in data.items():
+                version = str(info.get("version") or "").strip()
+                techs.append((tech.strip(), version.strip()))
+
+    # case analyze() single URL
+    else:
+        for tech, info in result.items():
+            version = str(info.get("version") or "").strip()
             techs.append((tech.strip(), version.strip()))
+
     return techs
 
 def normalize_name(name):
@@ -173,9 +187,9 @@ def manual_detection(args, url):
 
 def extract_assets_tech(args, url):
     wt_result = webtech_scan(url)
-    wp_result = wappalyze_that(url)
+    wp_raw = wappalyze_that(url)
     wt_techs = format_webtech(wt_result)
-    wp_techs = format_wappalyzer(wp_result)
+    wp_techs = format_wappalyzer(wp_raw)
     manual_techs = manual_detection(args, url)
 
     try:
@@ -210,7 +224,7 @@ def extract_assets_tech(args, url):
     # WebTech + Wappalyzer + manual
     # -------------------
     for name, ver in wt_techs + wp_techs + manual_techs:
-        key = name.strip()
+        key = normalize_name(name)
 
         merged[key] = pick_highest_version(
             merged.get(key, ""),
