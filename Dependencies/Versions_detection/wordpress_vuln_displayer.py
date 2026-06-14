@@ -2,6 +2,7 @@ import os, time, json, requests
 from pathlib import Path
 from packaging.version import Version, InvalidVersion
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
+from Dependencies.save_output import add_result
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -153,7 +154,18 @@ def scan_versions(versions_list, vulns_data, args):
                         f" {Y}|   {G}CVSS        : {W}{vuln['cvss']['score']} ({vuln['cvss']['rating']})\n"
                         f" {Y}|   {G}Reference   : {W}{vuln['references'][0]}\n"
                     )
-        
+
+                    if args.save:
+                        add_result("Version_and_vuln_detection", {
+                            "Type": "WordPress_detection",
+                                "data": {
+                                    "Title": f"{vuln['title']}",
+                                    "Description": f"{vuln['description']}",
+                                    "CVSS": f"{vuln['cvss']['score']} ({vuln['cvss']['rating']}",
+                                    "Reference": f"{vuln['references'][0]}"
+                                }
+                            })
+
         if not vuln_found:
             print(f" {Y}| {M}[-] {W}No vulnerabilities found\n")
 
