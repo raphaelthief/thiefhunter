@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.get_request import get_request
+from Dependencies.save_output import add_result
 
 load_dotenv()
 API_KEY = os.getenv("DNSDUMPSTER_API_KEY")
@@ -270,6 +271,16 @@ def get_subdomains(args, domain: str) -> list:
                         "ip": ip_info.get("ip", "N/A"),
                         "asn_name": ip_info.get("asn_name", "N/A")
                     }
+                    if args.save:
+                        add_result("Subdomains", {
+                            "type": "dnsdumpster",
+                            "data": {
+                                "source": "dnsdumpster",
+                                "subdomain": host,
+                                "ip": ip_info.get("ip", "N/A"),
+                                "asn": ip_info.get("asn_name", "N/A")
+                            }
+                        })
         except Exception as e:
             handle_error(e, "ERROR", args.verbose)
             pass
@@ -295,6 +306,15 @@ def get_subdomains(args, domain: str) -> list:
                         "ip": "N/A",
                         "asn_name": "(CRT.sh)"
                     }
+                    if args.save:
+                        add_result("Subdomains", {
+                            "type": "crt.sh",
+                            "data": {
+                                "source": "crtsh",
+                                "subdomain": sub,
+                                "ip": "N/A"
+                            }
+                        })
     except Exception as e:
         handle_error(e, "ERROR", args.verbose)
         pass
@@ -320,6 +340,14 @@ def get_subdomains(args, domain: str) -> list:
                         "ip": "N/A",
                         "asn_name": "(VirusTotal)"
                     }
+                    if args.save:
+                        add_result("Subdomains", {
+                            "type": "VirusTotal",
+                            "data": {
+                                "source": "virustotal",
+                                "subdomain": sub
+                            }    
+                        })
         except Exception as e:
             handle_error(e, "ERROR", args.verbose)
             pass
@@ -347,6 +375,17 @@ def get_subdomains(args, domain: str) -> list:
             "final_url": result["final_url"],
             "suspicious": result.get("suspicious", False)
         }
+        if args.save:
+            add_result("Subdomains", {
+                "type": "Probes",
+                "data": {
+                    "source": "probe",
+                    "subdomain": sub,
+                    "status": result["status_code"],
+                    "final_url": result["final_url"],
+                    "suspicious": result.get("suspicious", False)
+                    }
+            })
 
     # -------------------------
     # Print results
@@ -468,3 +507,15 @@ def get_subdomains(args, domain: str) -> list:
                 auth_type = " [HTTP DIGEST AUTH]"
 
             print(f"{status_color}[{status}] {W}{url} {G}{'(LOGIN PAGE?)' if suspicious else ''}{C}{auth_type}")
+            
+            if args.save:
+                add_result("Subdomains", {
+                    "Type": "http_check",
+                        "data": {
+                            "subdomain": sub,
+                            "url": url,
+                            "status": status,
+                            "auth": auth_type.strip(),
+                            "suspicious": suspicious
+                        }
+                })
