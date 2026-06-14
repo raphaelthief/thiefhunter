@@ -2,6 +2,7 @@ import argparse, sys, json, re, signal, base64, io
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import redirect_stdout
 from Dependencies.displays import isargsok, clear_screen, print_banner, help_menu, no_clean, M, W, R, Y, G, C, highlight, handle_error, init_env_file
+from Dependencies.save_output import init_report, save_report, add_result
 from Dependencies.url_parse import extract_domain, extract_strictdomain, extract_params
 from Dependencies.JWT.jwt_parser import analyze_jwt, print_jwt_analysis, is_jwt
 from Dependencies.JWT.jwt_payload import JWTPlayground
@@ -99,6 +100,10 @@ def process_target(args, target_url):
             wayback_output, total, filtered = wayback_urls(extracted_domain, exclude_ext=exclude_ext, show_all=local_args.show_all)
             for i, url in enumerate(wayback_output, 1):
                 print(f"{G}[{i:04}] {W}{url}")
+                if args.save:
+                    add_result("Wayback_machine", {
+                        "url": f"{url}"
+                    })
 
             print(f"\n{G}[+] Found {len(wayback_output)} URLs")
             print(f"{G}[*] {filtered} URLs filtered (assets / no params / excluded)")
@@ -120,8 +125,6 @@ def process_target(args, target_url):
             crawl_extractit(local_args, local_args.url, max_depth=local_args.extract, exclude_ext=exclude_ext, show_all=local_args.show_all)
 
 
-
-
     # -------------------------
     # Search for URLs, API, emails, phones, conf files
     # -------------------------
@@ -138,18 +141,42 @@ def process_target(args, target_url):
                         print(f"{G}    - {highlight(e, R)}")
                     else:
                         print(f"{G}    - {W}{e}")
+                        
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "emails",
+                            "data": {
+                                "email_found": e
+                            }
+                        })
                 print()
 
             if data["phones"]:
                 print(f"{G}[+] Phones (FR - 06 / 07)")
                 for p in data["phones"]:
                     print(f"{G}    - {W}{p}")
+                    
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "phones",
+                            "data": {
+                                "phone_found": p
+                            }
+                        })
                 print()
 
             if data["secrets"]:
                 print(f"{G}[+] Secrets")
                 for s in data["secrets"]:
                     print(f"{G}    - {W}{s}")
+                    
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "secrets",
+                            "data": {
+                                "secrets_found": s
+                            }
+                        })
                 print()
 
             if data["robots"]:
@@ -159,12 +186,28 @@ def process_target(args, target_url):
                         print(f"{G}    - {highlight(r, R)}")
                     else:
                         print(f"{G}    - {W}{r}")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "robots",
+                            "data": {
+                                "robots_found": r
+                            }
+                        })
                 print()
 
             if data["subdomains"]:
                 print(f"{G}[+] Detected subdomains")
                 for r in data["subdomains"]:
                     print(f"{G}    - {W}{r}")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "subdomains",
+                            "data": {
+                                "subdomain_found": r
+                            }
+                        })
                 print()
 
             if data["apis"]:
@@ -174,6 +217,14 @@ def process_target(args, target_url):
                         print(f"{G}    - {highlight(r, R)}")
                     else:
                         print(f"{G}    - {W}{r}")
+                    
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "apis",
+                            "data": {
+                                "api_found": r
+                            }
+                        })
                 print()
                 
             if data["sensitive_keywords"]:
@@ -182,6 +233,14 @@ def process_target(args, target_url):
                 for key, values in data["sensitive_keywords"].items():
                     for v in values:
                         print(f"{G}    -{W} ...{v}...")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "sensitive_keyword",
+                            "data": {
+                                "keyword_found": v
+                            }
+                        })
                 print()
 
             if data["sensitive_urls"]:
@@ -191,16 +250,36 @@ def process_target(args, target_url):
                         print(f"{G}    - {highlight(r, R)}")
                     else:
                         print(f"{G}    - {W}{r}")
+                        
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "sensitive_urls",
+                            "data": {
+                                "url_found": r
+                            }
+                        })
                 print()
 
             if data.get("base64"):
                 print(f"{G}[+] BASE64 decoded content")
                 for b in data["base64"]:
                     print(f"{G}    - {W}{b}")
+                    
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "base64_text",
+                            "data": {
+                                "b64_found": b
+                            }
+                        })
                 print()
 
             if not any(data.values()):
                 print(f"{R}[-] Nothing found")
+                if args.save:
+                    add_result("Secrets_WTF_scan", {
+                        "results": "nothing found"
+                    })
 
 
     # -------------------------
@@ -230,6 +309,15 @@ def process_target(args, target_url):
                         seen_all.add(key)
                         seen_headers.add(key)
                         print(f"    {G}- {highlight(full, Y)}")
+                        
+                        if args.save:
+                            add_result("Version_and_vuln_detection", {
+                                "Type": "headers",
+                                    "data": {
+                                        "Name": tech_name,
+                                        "Version": version
+                                    }
+                            })
 
                     if version and is_valid_version(version):
                         versions_list.append({
@@ -250,6 +338,16 @@ def process_target(args, target_url):
                     if key not in seen_all:
                         seen_all.add(key)
                         print(f"    {G}- {highlight(full, Y)}")
+                        
+                        if args.save:
+                            add_result("Version_and_vuln_detection", {
+                                "Type": "Assets",
+                                    "data": {
+                                        "Name": name,
+                                        "Version": version
+                                    }
+                            })
+                        
                         versions_list.append({
                             "name": name,
                             "version": version
@@ -341,12 +439,7 @@ def process_target(args, target_url):
                     for param in params:
                         example_url = examples.get(param, ep_base)
                         print(f"{G}[*] {W}Testing crawled param: {param} -> {example_url}")
-                        test_traversal(
-                            local_args,
-                            example_url,
-                            param,
-                            OS_type
-                        )
+                        test_traversal(local_args, example_url, param, OS_type)
 
 
     # -------------------------
@@ -415,6 +508,7 @@ def main():
     parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
+    parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
     parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>")
     
     args = parser.parse_args()
@@ -460,6 +554,14 @@ def main():
             print(f"{R}[-] Cannot read file: {e}")
             sys.exit(1)
 
+
+        # -------------------------
+        # Save Output (init)
+        # -------------------------
+        if args.save:
+            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                init_report(args)
+
         # -------------------------
         # Sequential mode
         # -------------------------
@@ -476,14 +578,40 @@ def main():
             except Exception as e:
                 print(f"{R}[-] Error with {target}: {e}")
 
+        # -------------------------
+        # Save Output (end)
+        # -------------------------
+        if args.save:
+            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                print(f"\n{Y}[!] {W}Generating the JSON repor...")
+                filename = save_report(args)
+                print(f"{G}[+] {W}Report saved to {filename}")
+
         print(f"\n{Y}[!] {W}End of multi-target scan")
-        
+
     else:
-        
+
+        # -------------------------
+        # Save Output (init)
+        # -------------------------
+        if args.save:
+            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                init_report(args)
+
         # -------------------------
         # Single mode
         # -------------------------
         process_target(args, args.url)
+
+        # -------------------------
+        # Save Output (end)
+        # -------------------------
+        if args.save:
+            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                print(f"\n{Y}[!] {W}Generating the JSON repor...")
+                filename = save_report(args)
+                print(f"{G}[+] {W}Report saved to {filename}")
+
         print(f"\n{Y}[!] {W}End of search")
 
 
