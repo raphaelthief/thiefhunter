@@ -6,6 +6,40 @@ The tool focusses on adaptive offensive automation with practical OPSEC awarenes
 
 ![Main menu](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Main.png "Main menu")
 
+## Installation
+```
+pip install -r requirements.txt && playwright install
+```
+For optimal use of the features, make sure to provide the various free API keys from the .env file :
+```
+DNSDUMPSTER_API_KEY=
+VIRUSTOTAL_API_KEY=
+WORDFENCE_API_KEY=
+SEARCH_VULNS_API_KEY=
+GITHUB_API_KEY=
+```
+- DNSDUMPSTER : https://dnsdumpster.com/developer/
+  
+  -> Used to enumerate subdomains ```--subdomains```
+  
+- VIRUSTOTAL : https://www.virustotal.com/
+  
+  -> Used to enumerate subdomains ```--subdomains```
+
+- WORDFENCE : https://www.wordfence.com/
+  
+  -> Used for enumerating CVEs and exploits related to application versions (Wordpress) ```--vln```
+
+- SEARCHVULNS : https://search-vulns.com/api/setup
+  
+  -> Used for enumerating CVEs and exploits related to application versions ```--vln and --exp```
+
+- GITHUB : https://github.com/
+  
+  -> Used for enumerating GitHub profiles to discover emails used in commits ```--commits```
+
+
+
 
 ## Key Features
 ### Advanced Vulnerability Enumeration
