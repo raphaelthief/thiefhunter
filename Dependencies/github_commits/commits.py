@@ -1,6 +1,7 @@
 import time
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.get_request import get_request
+from Dependencies.save_output import add_result
 
 # =========================
 # Personal Mail Providers
@@ -129,6 +130,26 @@ def extract_commits(args) -> None:
         handle_error("GitHub API rate limit exceeded", response.status_code)
         return
 
+    if args.save:
+        add_result("Github", {
+            "type": "github_profile",
+            "data": {
+                "username": user_data.get("login"),
+                "name": user_data.get("name"),
+                "company": user_data.get("company"),
+                "type": user_data.get("type"),
+                "location": user_data.get("location"),
+                "email": user_data.get("email"),
+                "twitter": user_data.get("twitter_username"),
+                "bio": user_data.get("bio"),
+                "public_repos": user_data.get("public_repos"),
+                "followers_url": user_data.get("followers_url"),
+                "avatar_url": user_data.get("avatar_url"),
+                "created_at": user_data.get("created_at"),
+                "updated_at": user_data.get("updated_at")
+            }
+        })
+
     display_user_info(user_data, url)
 
 
@@ -155,5 +176,17 @@ def repos(args, username: str) -> None:
                 f"{W}(Repo: {email_info['repo']})"
             )
             user_emails.setdefault(username, []).append(formatted_email)
+            
+            if args.save:
+                add_result("Github", {
+                    "type": "github_emails",
+                    "data": {
+                        "username": email_info["username"],
+                        "email": email_info["email"],
+                        "repo": email_info["repo"],
+                        "personal": is_personal_email(email_info["email"])
+                    }
+                })
+            
         time.sleep(0.7)
     display_grouped_emails(user_emails)
