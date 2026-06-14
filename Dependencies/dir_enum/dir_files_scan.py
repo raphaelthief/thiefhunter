@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import urlparse, urljoin
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.get_request import get_request
-
+from Dependencies.save_output import add_result
 
 WORDLISTS = {
     "admin_logins.txt": 1,
@@ -156,16 +156,43 @@ def analyze_response(target, response):
                 symlinks += 1
 
         tqdm.write(f"      {G}- {C}[INFO]{W} Directories: {dirs} | Files: {files} | Symlinks: {symlinks}")
+        add_result("Directory_Enumeration", {
+            "Type": "Directory_Listing",
+            "data": {
+                "url": target,
+                "status": status,
+                "size": length,
+                "words": words
+            }
+        })
+
 
     elif target.endswith("/.listing"):
         tqdm.write(f"      {G}- {R}[.LISTING FOUND]{W}")
-
+        add_result("Directory_Enumeration", {
+            "Type": "Directory_Listing",
+            "data": {
+                "url": target
+            }
+        })
+        
     if target.endswith("/.git/"):
         tqdm.write(f"      {R}[GIT EXPOSED]{W}")
+        add_result("Directory_Enumeration", {
+            "Type": "Git_Exposed",
+            "data": {
+                "url": target
+            }
+        })
 
     if target.endswith("/.svn/"):
         tqdm.write(f"      {G}- {R}[SVN EXPOSED]{W}")
-
+        add_result("Directory_Enumeration", {
+            "Type": "SVN_Exposed",
+            "data": {
+                "url": target
+            }
+        })
     return discovered_dirs
 
 
@@ -206,19 +233,69 @@ def worker(args, base_url, path, baseline):
         # 2. Check for Valid Finds
         if status == 200:
             tqdm.write(f"{R}[200]{W} {target} (Size: {length})")
+            if args.save:
+                add_result("Directory_Enumeration", {
+                    "Type": "Path_Found",
+                    "data": {
+                        "url": target,
+                        "status": status,
+                        "size": length,
+                        "words": words
+                    }
+                })
             analyze_response(target, response)
         elif status == 201:
             tqdm.write(f"{Y}[201]{W} {target}")
+            if args.save:
+                add_result("Directory_Enumeration", {
+                    "Type": "Path_Found",
+                    "data": {
+                        "url": target,
+                        "status": status,
+                        "size": length,
+                        "words": words
+                    }
+                })
         elif status == 202:
             tqdm.write(f"{Y}[202]{W} {target}")
+            if args.save:
+                add_result("Directory_Enumeration", {
+                    "Type": "Path_Found",
+                    "data": {
+                        "url": target,
+                        "status": status,
+                        "size": length,
+                        "words": words
+                    }
+                })
         elif status == 301 or status == 302 or status == 404:
             return
         elif status == 403:
+            if args.save:
+                add_result("Directory_Enumeration", {
+                    "Type": "Path_Found",
+                    "data": {
+                        "url": target,
+                        "status": status,
+                        "size": length,
+                        "words": words
+                    }
+                })
             if args.verbose:
                 tqdm.write(f"{M}[403]{W} {target} (Forbidden)")
         else:
             if args.verbose:
                 tqdm.write(f"{M}[{status}]{W} {target}")
+            if args.save:
+                add_result("Directory_Enumeration", {
+                    "Type": "Path_Found",
+                    "data": {
+                        "url": target,
+                        "status": status,
+                        "size": length,
+                        "words": words
+                    }
+                })
 
     except Exception as e:
         handle_error(e, "ERROR", args.verbose)
@@ -298,13 +375,29 @@ def do_fuzz_paths(args):
         print(f"{G}[*]{W} Calculating baseline (soft 404 detection)...")
         baseline = get_baseline(args, base_url)
         print(f"{G}[*]{W} Baseline detected -> Status: {Y}{baseline[0]}{W}, Length: {Y}{baseline[1]}{W}, Words: {Y}{baseline[2]}")
-
+        if args.save:
+            add_result("Directory_Enumeration", {
+                "Type": "Baseline",
+                "data": {
+                    "status": baseline[0],
+                    "length": baseline[1],
+                    "words": baseline[2]
+                }
+            })
 
         # 4. Check robots.txt Disallow
         print(f"{G}[*]{W} Checking robots.txt...")
         robots_paths = get_robots_paths(args, base_url)
         if robots_paths:
             print(f"{G}[*]{W} Found {len(robots_paths)} paths in robots.txt")
+            if args.save:
+                add_result("Directory_Enumeration", {
+                    "Type": "Robots_Disallow",
+                    "data": {
+                        "count": len(robots_paths),
+                        "paths": robots_paths
+                    }
+                })
             skipped = 0
             for path in robots_paths:
                 if "*" in path:
@@ -346,6 +439,15 @@ def do_fuzz_paths(args):
             if choice in ("y", "yes"):
                 for listing in discovered_listings:
                     crawl_directory_listing(args, listing)
+        if args.save:
+            add_result("Directory_Enumeration", {
+                "Type": "Summary",
+                "data": {
+                    "wordlists": selected_files,
+                    "tested_paths": len(paths),
+                    "directory_listings_found": list(discovered_listings)
+                }
+            })
 
     except Exception as e:
         handle_error(e, "ERROR", args.verbose)
