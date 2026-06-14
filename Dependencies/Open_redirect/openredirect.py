@@ -4,6 +4,7 @@ from collections import deque
 from bs4 import BeautifulSoup
 from Dependencies.get_request import get_request
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
+from Dependencies.save_output import add_result
 
 # =========================================================
 # INTERESTING PARAMS
@@ -306,9 +307,31 @@ def crawl_extract(args, start_url, max_depth=1):
                 if full not in seen:
                     queue.append((full, depth + 1))
 
+
+    if args.save:
+        add_result("OpenRedirect", {
+            "Type": "Crawl_Summary",
+            "data": {
+                "pages": len(visited),
+                "endpoints": len(results),
+                "allowed_domains": list(allowed_domains)
+            }
+        })
     print(f"\n{G}[+] Crawl finished")
     print(f"{G}[+] {W}Pages: {len(visited)}")
     print(f"{G}[+] {W}Endpoints: {len(results)}")
+    if args.save:
+        for base, data in results.items():
+            add_result("OpenRedirect", {
+                "Type": "Endpoint_Discovered",
+                "data": {
+                    "endpoint": base,
+                    "params": list(data["params"]),
+                    "suspicious": data["suspicious"],
+                    "examples": data["examples"]
+                }
+            })
+    
     return results
 
 
@@ -339,13 +362,34 @@ def test_openredirect(args, base_url, param):
             r = get_request(args, url)
         except Exception:
             continue
+        
+        if args.verbose:
+            print(f"{Y}[{r.status_code}] {W}{url}")
+
+        if args.save:
+            add_result("OpenRedirect", {
+                "Type": "Tested_Open_Redirect",
+                "url": url
+            })
 
         if not r:
             continue
 
         if is_openredirect(r, payload):
+            location = r.headers.get("Location")
             print(f"{R}[OPEN REDIRECT] {W}{url}")
-            print(f"{Y} -> Location: {W}{r.headers.get('Location')}")
+            print(f"{Y} -> Location: {W}{location}")
+            if args.save:
+                add_result("OpenRedirect", {
+                    "Type": "Open_Redirect",
+                    "data": {
+                        "url": url,
+                        "parameter": param,
+                        "payload": payload,
+                        "status": r.status_code,
+                        "location": location
+                    }
+                })
             return True
     return False
 
@@ -361,10 +405,16 @@ def run_openredirect(args):
     if parsed_params:
         print(f"{Y}[!] {W}Params detected: {parsed_params}")
         for param in parsed_params:
-            if not is_interesting_param(param):
-                continue
-
             print(f"[*] Testing param: {param}")
+            if args.save:
+                add_result("OpenRedirect", {
+                    "Type": "Parameter_Tested",
+                    "data": {
+                        "url": args.url,
+                        "parameter": param,
+                        "source": "direct"
+                    }
+                })
             test_openredirect(args, args.url, param)
     else:
         print(f"{R}[-] {W}No params found, crawling...")
@@ -382,4 +432,13 @@ def run_openredirect(args):
 
                 example_url = data["examples"].get(param, base)
                 print(f"[*] Testing crawled param: {param}")
+                if args.save:
+                    add_result("OpenRedirect", {
+                        "Type": "Parameter_Tested",
+                        "data": {
+                            "url": example_url,
+                            "parameter": param,
+                            "source": "crawler"
+                        }
+                    })
                 test_openredirect(args, example_url, param)
