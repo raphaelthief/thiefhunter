@@ -1,5 +1,6 @@
 import requests, time, os
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
+from Dependencies.save_output import add_result
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -71,13 +72,7 @@ def scan_all_versions(query, args):
         "API-Key": API_KEY
     }
 
-    response = requests.get(
-        URL,
-        params=params,
-        headers=headers,
-        timeout=15
-    )
-
+    response = requests.get(URL, params=params, headers=headers, timeout=15)
     print(f"{G}[+] {C}{query}")
     print(f"{Y}-" * 40)
 
@@ -122,7 +117,20 @@ def scan_all_versions(query, args):
 
     if not vulns:
         print(f" {Y}| {M}[-] {W}No vulnerabilities found\n")
-        return
+        
+        if args.save:
+            add_result("Version_and_vuln_detection", {
+                "Type": "Exploit_CVE_detection",
+                    "data": {
+                        "product": query,
+                        "cpe": cpes[0] if cpes else None,
+                        "status": status,
+                        "latest": latest,
+                        "eol_url": reference,
+                        "vulnerabilities": []
+                    }
+                })
+            return
 
     sorted_vulns = sorted(
         vulns.items(),
@@ -133,12 +141,11 @@ def scan_all_versions(query, args):
         ),
         reverse=True
     )
-
+    
+    vuln_entries = []
     for cve_id, v in sorted_vulns:
-
         cvss = v.get("severity", {}).get("CVSS", {})
         epss = v.get("severity", {}).get("EPSS", {})
-
         score = cvss.get("score")
 
         try:
@@ -162,6 +169,16 @@ def scan_all_versions(query, args):
         )
 
         exploits = v.get("exploits", [])
+        vuln_entries.append({
+            "cve": cve_id,
+            "cvss": score,
+            "epss": epss.get("score"),
+            "kev": v.get("cisa_kev", False),
+            "match_reason": v.get("match_reason"),
+            "description": v.get("description"),
+            "exploits": exploits
+        })
+        
         if exploits:
             print(f" {Y}| [!] {R}Exploits")
 
@@ -169,3 +186,16 @@ def scan_all_versions(query, args):
                 print(f" {Y}|     {G}- {W}{e}")
         print()
     print(f"{Y}-" * 40)
+    
+    if args.save:
+        add_result("Version_and_vuln_detection", {
+            "Type": "Exploit_CVE_detection",
+                "data": {
+                    "product": query,
+                    "cpe": cpes[0] if cpes else None,
+                    "status": status,
+                    "latest": latest,
+                    "eol_url": reference,
+                    "vulnerabilities": vuln_entries
+                }
+            })
