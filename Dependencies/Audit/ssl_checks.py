@@ -5,6 +5,7 @@ from cryptography.hazmat.backends import default_backend
 from datetime import datetime, timezone
 from collections import defaultdict
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
+from Dependencies.save_output import add_result
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 PORT = 443
@@ -339,6 +340,8 @@ def get_cert(host, port, args=None):
                     "version": ssock.version(),
                     "cipher": ssock.cipher(),
                     "subject": ssock.getpeercert().get("subject", []),
+                    "not_before": cert.not_valid_before_utc,
+                    "not_after": cert.not_valid_after_utc,
                     "issuer": ssock.getpeercert().get("issuer", []),
                     "san": ssock.getpeercert().get("subjectAltName", []),
                     "signature_algorithm":
@@ -470,33 +473,62 @@ def evaluate_cert_security(ext):
 # ----------------------------
 def print_protocols(results):
     print(f"{G}[+] SSL/TLS support:{W}")
+    protocols = {}
     for k, v in results.items():
         if k in ["SSLv3", "TLSv1", "TLSv1.1"]:
             if v:
                 print(f" {k:<8} {Y}offered (deprecated){W}")
+                status = "deprecated_offered"
             else:
                 print(f" {k:<8} {G}not offered (OK){W}")
+                status = "not_offered"
 
-        # TLS 1.2
         elif k == "TLSv1.2":
             if v:
                 print(f" {k:<8} {G}offered (OK){W}")
+                status = "offered"
             else:
                 print(f" {k:<8} {R}not offered (weak server){W}")
+                status = "missing"
 
-        # TLS 1.3
         elif k == "TLSv1.3":
             if v:
                 print(f" {k:<8} {G}offered (modern){W}")
+                status = "offered"
             else:
                 print(f" {k:<8} {R}not offered (missing modern TLS){W}")
+                status = "missing"
+
+        protocols[k] = {
+            "supported": v,
+            "status": status
+        }
+
+    severity = "INFO"
+    if results.get("SSLv3") or results.get("TLSv1") or results.get("TLSv1.1"):
+        severity = "HIGH"
+    elif not results.get("TLSv1.3"):
+        severity = "MEDIUM"
+
+    add_result("Audit", {
+        "Type": "Protocols",
+        "Severity": f"{severity}",
+        "data": f"{protocols}"
+    })
 
 
 def print_ciphers(ciphers):
     print(f"\n{G}[+] Cipher suites:{W}")
+
+    report_data = {}
+    severity = "INFO"
+
     for version in ["TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"]:
         print(f"{M}{version}{W}")
+
         items = ciphers.get(version, [])
+        report_data[version] = []
+
         if not items:
             print(f"  {R}-")
             print()
@@ -508,14 +540,36 @@ def print_ciphers(ciphers):
             sec = item.get("security", "WEAK")
             reasons = item.get("reasons", [])
 
+            report_data[version].append({
+                "cipher": cipher,
+                "bits": bits,
+                "security": sec,
+                "reasons": reasons
+            })
+
             if sec == "GOOD":
                 color = G
             elif sec == "WEAK":
                 color = Y
+
+                if severity == "INFO":
+                    severity = "MEDIUM"
             else:
                 color = R
+                severity = "HIGH"
+
             reason_str = f" [{', '.join(reasons)}]" if reasons else ""
-            print(f"  {color}- {cipher} ({bits} bits){W}{reason_str}")        
+
+            print(
+                f"  {color}- {cipher} ({bits} bits)"
+                f"{W}{reason_str}"
+            )
+
+    add_result("Audit", {
+        "Type": "Cipher_suites",
+        "Severity": f"{severity}",
+        "data": f"{report_data}"
+    })        
 
 
 def print_cert(cert):
@@ -575,6 +629,27 @@ def print_cert(cert):
     else:
         print(f"{Y}Cipher:{W} N/A")
 
+    tls_version = cert.get("version")
+
+    issuer_data = issuer
+
+    if isinstance(issuer, (list, tuple)):
+        issuer_data = {}
+
+        for part in issuer:
+            for item in part:
+                issuer_data[item[0]] = item[1]
+
+    cert_data = {
+        "cn": cn,
+        "san": san,
+        "issuer": issuer_data,
+        "tls_version": tls_version,
+        "cipher": cipher[0] if cipher else None,
+        "cipher_bits": cipher[2] if cipher else None,
+    }
+
+
     fmt = "%b %d %H:%M:%S %Y %Z"
     try:
         not_before = cert.get("not_before")
@@ -631,9 +706,23 @@ def print_cert(cert):
         print(f"  Lifetime  : {total_days} days")
         print(f"  Remaining : {remaining_days} days")
         print(f"  Status    : {status}")
+        
+        cert_data.update({
+            "not_before": str(not_before),
+            "not_after": str(not_after),
+            "lifetime_days": total_days,
+            "remaining_days": remaining_days,
+            "status": status
+        })
     except Exception as e:
         print(f"{Y}Validity: N/A{W}")
         print(f"  DEBUG: {e}")
+        cert_data["validity_error"] = str(e)
+
+    add_result("Audit", {
+        "Type": "Certificate",
+        "data": f"{cert_data}"
+    })
 
 
 def print_cert_extended(ext):
@@ -656,6 +745,16 @@ def print_cert_extended(ext):
     else:
         print(f"{Y}Server key size{W:<9} {W}{key_type} {key_size} bits{W}")
 
+    add_result("Audit", {
+        "Type": "Certificate_extended",
+        "data": {
+            "signature_algorithm": sig,
+            "key_type": key_type,
+            "key_size": key_size,
+            "rsa_exponent": exp
+        }
+    })
+
 def print_cert_rating(ext):
     rating, score, issues = evaluate_cert_security(ext)
     print(f"Score : {score}/100")
@@ -673,6 +772,15 @@ def print_cert_rating(ext):
         print(f"{Y}Issues:{W}")
         for i in issues:
             print(f" - {i}")
+
+    add_result("Audit", {
+        "Type": "Certificate_rating",
+        "data": {
+            "rating": rating,
+            "score": score,
+            "issues": issues
+        }
+    })
 
 
 # ----------------------------
@@ -694,12 +802,31 @@ def ssl_that(HOST, args):
     print(f"\n{G}[+] ALPN:{W}")
     if alpn == "h2":
         print(f"  {G}OK - HTTP/2 supported ({alpn}){W}")
+        add_result("Audit", {
+            "Type": "ALPN",
+                "result": "HTTP/2 supported"
+            })
+
     elif alpn == "http/1.1":
         print(f"  {Y}OK - only HTTP/1.1 ({alpn}){W}")
+        add_result("Audit", {
+            "Type": "ALPN",
+                "result": f"OK - only HTTP/1.1 ({alpn})"
+            })
+            
     elif alpn is None:
         print(f"  {R}NOT SUPPORTED - no ALPN{W}")
+        add_result("Audit", {
+            "Type": "ALPN",
+                "result": "NOT SUPPORTED - no ALPN"
+            })
+            
     else:
         print(f"  {C}UNKNOWN - {alpn}{W}")
+        add_result("Audit", {
+            "Type": "ALPN",
+                "result": f"UNKNOWN - {alpn}"
+            })
 
     cert = get_cert(HOST, PORT, args=args)
     if cert.get("error"):
