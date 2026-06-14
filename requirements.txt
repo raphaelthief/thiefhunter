@@ -16,3 +16,4 @@ argparse
 tldextract
 urllib3
 packaging
+tqdm
