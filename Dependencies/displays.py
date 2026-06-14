@@ -512,7 +512,13 @@ def isargsok(args, what):
             print(f"{R}[Error] args --url or --file missingk")
             print(f"{W}   --> Skipping...\n")
             return False
-            
+
+    if what == "need_commit":
+        if not args.commit:
+            print(f"{R}[Error] args --commit missingk")
+            print(f"{W}   --> Skipping...\n")
+            return False
+
     if what == "need_wayback_or_extract":
         if not (args.wayback or args.extract):
             print(f"{R}[Error] args --wayback missing")
