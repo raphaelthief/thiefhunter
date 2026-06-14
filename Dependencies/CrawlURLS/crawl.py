@@ -3,6 +3,7 @@ from urllib.parse import urljoin, urlparse, parse_qs
 from bs4 import BeautifulSoup
 from Dependencies.get_request import get_request
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
+from Dependencies.save_output import add_result
 
 # =========================================================
 # NORMALIZE URL PARAMETERS
@@ -60,7 +61,6 @@ def crawl_extractit(args, start_url, max_depth=2, exclude_ext=None, show_all=Fal
     # PROCESS LINKS
     # -----------------------------------------------------
     def process_link(args, link, current_url, depth):
-
         link = urljoin(current_url, link)
         link = link.split("#")[0]
 
@@ -169,6 +169,11 @@ def crawl_extractit(args, start_url, max_depth=2, exclude_ext=None, show_all=Fal
     print(f"\n{G}[+] Found {len(results)} parameterized URLs")
     for i, url in enumerate(results, 1):
         print(f"{G}[{i:04}] {W}{url}")
+        if args.save:
+            add_result("url_crawling", {
+                "url": f"{url}"
+            })
+
 
     # =====================================================
     # PRINT STATS
