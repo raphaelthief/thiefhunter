@@ -508,7 +508,7 @@ def main():
     parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
-    parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
+    parser.add_argument("--save", nargs="?", const=True, default=False, help="Save results as JSON (--save or --save filename)")
     parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>")
     
     args = parser.parse_args()
