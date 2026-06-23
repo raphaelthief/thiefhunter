@@ -53,6 +53,11 @@ GENERAL OPTIONS
           Some modules internally override timeout values
           depending on request complexity or remote latency
 
+  {C}--save{G}
+      Save results as JSON output
+      Can be used as a flag (--save) or with a filename (--save file.json)
+      If no filename is provided, a default file name will be used based on args --url or --comit
+
 
 {Y}PROXY / NETWORK
 ───────────────────────────────────────────────────────────────────────{G}
