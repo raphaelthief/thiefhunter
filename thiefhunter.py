@@ -583,7 +583,7 @@ def main():
         # -------------------------
         if args.save:
             if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                print(f"\n{Y}[!] {W}Generating the JSON repor...")
+                print(f"\n{Y}[!] {W}Generating the JSON report...")
                 filename = save_report(args)
                 print(f"{G}[+] {W}Report saved to {filename}")
 
