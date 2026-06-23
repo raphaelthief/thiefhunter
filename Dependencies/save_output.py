@@ -23,17 +23,27 @@ def add_result(module, result):
 
 
 def save_report(args):
-    if args.url:
-        if not args.url.startswith(("http://", "https://")):
-            args.url = f"https://{args.url}"
+    def normalize_url(url):
+        if url and not url.startswith(("http://", "https://")):
+            return f"https://{url}"
+        return url
 
-        domain = urlparse(args.url).hostname
-        filename = f"{domain}.json"
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(REPORT, f, indent=4, ensure_ascii=False)
-        return filename
+    def default_filename():
+        if args.url:
+            url = normalize_url(args.url)
+            domain = urlparse(url).hostname or "output"
+            return f"{domain}.json"
+        return f"{args.commit}.json"
+
+    if getattr(args, "save", None):
+        if args.save is True:
+            filename = default_filename()
+        else:
+            filename = args.save
     else:
-        filename = f"{args.commit}.json"
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(REPORT, f, indent=4, ensure_ascii=False)
-        return filename
+        filename = default_filename()
+
+    url = normalize_url(args.url) if args.url else None
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(REPORT, f, indent=4, ensure_ascii=False)
+    return filename
