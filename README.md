@@ -42,6 +42,13 @@ GITHUB_API_KEY=
 
 
 ## Key Features
+### Save results
+You can save the CLI output directly to a JSON file using the `--save` option.
+
+- Use ```--save``` to automatically save results with a default filename (based on the domain name)
+- Use ```--save <FILE_NAME.json>``` to specify a custom output filename
+
+
 ### Advanced Vulnerability Enumeration
 Wordfence API Integration (No WPScan-style token limitations)
 ThiefHunter leverages the Wordfence vulnerability intelligence API for WordPress vulnerability enumeration.
@@ -53,6 +60,8 @@ Advantages:
 - continuous CVE intelligence integration
 
 This allows large-scale WordPress audits without artificial API restrictions.
+
+It is strongly recommended to use the free APIs provided in the .env file to obtain working results for this feature!
 
 
 ### Hybrid Technology Detection Engine
