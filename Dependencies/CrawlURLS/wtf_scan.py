@@ -465,6 +465,12 @@ def is_valid_email(email):
     return True
 
 def is_sensitive_url(url):
+    if isinstance(url, dict):
+        url = url.get("value") or url.get("url") or ""
+
+    if not isinstance(url, str):
+        return False
+
     lower = url.lower()
     path = urlparse(url).path.lower()
 
@@ -479,8 +485,11 @@ def is_sensitive_url(url):
 def is_personal_email(email, domain):
     return domain not in email
 
-def extract_api_endpoints(html):
-    return re.findall(r'https?://[a-zA-Z0-9.-]+/(?:api|graphql|v\d+)/[^\s"\'<>]*', html)
+def extract_api_endpoints(html, page):
+    return [
+        {"value": m, "page": page, "line": 0}
+        for m in re.findall(r'https?://[a-zA-Z0-9.-]+/(?:api|graphql|v\d+)/[^\s"\'<>]*', html)
+    ]
 
 def extract_js(html):
     return re.findall(r'<script.*?>(.*?)</script>', html, re.DOTALL | re.IGNORECASE)
@@ -489,20 +498,38 @@ def is_valid_url(url):
     bad_ext = (".png", ".jpg", ".jpeg", ".gif", ".css", ".svg", ".woff", ".ttf")
     return not url.lower().endswith(bad_ext)
 
-def extract_from_text(text):
-    emails = [
-    e for e in re.findall(EMAIL_REGEX, text)
-    if is_valid_email(e)
-    ]
-    phones = set(re.findall(PHONE_REGEX, text))
-    secrets = set()
-    for pattern in SECRET_REGEX:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        secrets.update(matches)
+def extract_from_text(text, page):
+    emails = []
+    phones = []
+    secrets = []
 
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        for email in re.findall(EMAIL_REGEX, line):
+            if is_valid_email(email):
+                emails.append({
+                    "value": email,
+                    "page": page,
+                    "line": lineno
+                })
+                
+        for phone in re.findall(PHONE_REGEX, line):
+            phones.append({
+                "value": phone,
+                "page": page,
+                "line": lineno
+            })
+            
+        for pattern in SECRET_REGEX:
+            for secret in re.findall(pattern, line, re.IGNORECASE):
+                secrets.append({
+                    "value": secret,
+                    "page": page,
+                    "line": lineno
+                })
     return emails, phones, secrets
 
-def parse_robots(start_url):
+
+def parse_robots(start_url, args):
     parsed = urlparse(start_url)
     robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
     disallowed = set()
@@ -572,14 +599,14 @@ def scan_sensitive_urls(urls):
 def wtf_scan(start_url, args, max_depth=2):
     found_seen = set()
     visited = set()
-    found_emails = set()
-    found_phones = set()
-    found_secrets = set()
-    found_apis = set()
+    found_emails = list()
+    found_phones = list()
+    found_secrets = list()
+    found_apis = list()
     found_sensitive_keywords = {}
-    found_sensitive_urls = set()
+    found_sensitive_urls = list()
     found_subdomains = set()
-    found_base64 = set()
+    found_base64 = list()
     
     ext = tldextract.extract(args.url)
     base_domain = f"{ext.domain}.{ext.suffix}"
@@ -603,31 +630,43 @@ def wtf_scan(start_url, args, max_depth=2):
             for k, v in res.headers.items():
                 if isinstance(v, str):
                     for decoded in extract_base64(v):
-                        found_base64.add(decoded)
+                        found_base64.append({
+                            "value": decoded,
+                            "page": url,
+                            "line": 0
+                        })
 
             # 1. HTML scan
-            emails, phones, secrets = extract_from_text(text)
-            found_emails.update(emails)
-            found_phones.update(phones)
-            found_secrets.update(secrets)
+            emails, phones, secrets = extract_from_text(text, url)
+            found_emails.extend(emails)
+            found_phones.extend(phones)
+            found_secrets.extend(secrets)
             b64_decoded = extract_base64(text)
             for item in b64_decoded:
-                found_base64.add(item)
+                found_base64.append({
+                    "value": item,
+                    "page": url,
+                    "line": 0
+                })
 
 
             # 2. JS scan
             for script in extract_js(text):
-                e, p, s = extract_from_text(script)
-                found_emails.update(e)
-                found_phones.update(p)
-                found_secrets.update(s)
+                e, p, s = extract_from_text(script, url)
+                found_emails.extend(e)
+                found_phones.extend(p)
+                found_secrets.extend(s)
                 for item in extract_base64(script):
-                    found_base64.add(item)
+                    found_base64.append({
+                        "value": item,
+                        "page": url,
+                        "line": 0
+                    })
 
 
             # 3. API scan
-            apis = extract_api_endpoints(text)
-            found_apis.update(apis)
+            apis = extract_api_endpoints(text, url)
+            found_apis.extend(apis)
 
             # 4. Sensitive keyword scan in source code
             results = scan_sensitive_content(
@@ -641,7 +680,12 @@ def wtf_scan(start_url, args, max_depth=2):
                 found_sensitive_keywords[key].extend(values)
 
             links = re.findall(r'(?:href|src)=["\'](.*?)["\']', text)
-            found_sensitive_urls.update(scan_sensitive_urls(links))
+            for u in scan_sensitive_urls(links):
+                found_sensitive_urls.append({
+                    "value": u,
+                    "page": url,
+                    "line": 0
+                })
 
             # 5 Detect subdomain in discovered links
             domain_matches = re.findall(
@@ -674,16 +718,16 @@ def wtf_scan(start_url, args, max_depth=2):
             pass
 
     crawl(start_url, 0)
-    robots_urls = parse_robots(start_url)
+    robots_urls = parse_robots(start_url, args)
 
     return {
-        "emails": sorted(found_emails),
-        "phones": sorted(found_phones),
-        "secrets": sorted(found_secrets),
+        "emails": sorted(found_emails, key=lambda x: x["value"]),
+        "phones": sorted(found_phones, key=lambda x: x["value"]),
+        "secrets": sorted(found_secrets, key=lambda x: x["value"]),
         "robots": sorted(robots_urls),
         "apis": sorted(found_apis),
-        "sensitive_keywords": found_sensitive_keywords,
-        "sensitive_urls": sorted(found_sensitive_urls),
+        "sensitive_keywords": sorted(found_sensitive_keywords, key=lambda x: x["value"]),
+        "sensitive_urls": sorted(found_sensitive_urls, key=lambda x: x["value"]),
         "subdomains": sorted(found_subdomains),
-        "base64": sorted(found_base64),
+        "base64": sorted(found_base64, key=lambda x: x["value"]),
     }
