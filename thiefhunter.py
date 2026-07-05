@@ -130,23 +130,46 @@ def process_target(args, target_url):
     # -------------------------
     if local_args.wtf:
         if isargsok(local_args, "need_url"):
+            def fmt(item):
+                """
+                Normalizes scan outputs for printing.
+                Works with:
+                - dicts: {"value", "page", "line"}
+                - strings
+                """
+                if isinstance(item, dict):
+                    value = item.get("value", "")
+                    page = item.get("page")
+                    line = item.get("line")
+                    if page is not None and line is not None:
+                        return f"{value} ({page}:{line})"
+                    return str(value)
+                return str(item)
+            
             print(f"{C}[!] {G}Running WTF scan (depth={local_args.wtf})")
             data = wtf_scan(local_args.url, local_args, max_depth=local_args.wtf)
-
+            print()
+            
             if data["emails"]:
                 print(f"{G}[+] Emails")
                 extracted_domain = extract_strictdomain(local_args.url)
                 for e in data["emails"]:
-                    if is_personal_email(e, extracted_domain):
-                        print(f"{G}    - {highlight(e, R)}")
+                    email = e["value"]
+                    page = e["page"]
+                    line = e["line"]
+
+                    if is_personal_email(email, extracted_domain):
+                        print(f"{G}    - {highlight(email, R)} {Y}({page}:{line})")
                     else:
-                        print(f"{G}    - {W}{e}")
+                        print(f"{G}    - {W}{email} {Y}({page}:{line})")
                         
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "emails",
                             "data": {
-                                "email_found": e
+                                "email_found": email,
+                                "page": page,
+                                "line": line
                             }
                         })
                 print()
@@ -154,13 +177,15 @@ def process_target(args, target_url):
             if data["phones"]:
                 print(f"{G}[+] Phones (FR - 06 / 07)")
                 for p in data["phones"]:
-                    print(f"{G}    - {W}{p}")
-                    
+                    print(f"{G}    - {W}{p['value']} {Y}({p['page']}:{p['line']})")
+
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "phones",
                             "data": {
-                                "phone_found": p
+                                "phone_found": p["value"],
+                                "page": p["page"],
+                                "line": p["line"]
                             }
                         })
                 print()
@@ -168,13 +193,15 @@ def process_target(args, target_url):
             if data["secrets"]:
                 print(f"{G}[+] Secrets")
                 for s in data["secrets"]:
-                    print(f"{G}    - {W}{s}")
-                    
+                    print(f"{G}    - {W}{s['value']} {Y}({s['page']}:{s['line']})")
+
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "secrets",
                             "data": {
-                                "secrets_found": s
+                                "secret_found": s["value"],
+                                "page": s["page"],
+                                "line": s["line"]
                             }
                         })
                 print()
@@ -214,15 +241,17 @@ def process_target(args, target_url):
                 print(f"{G}[+] APIs")
                 for r in data["apis"]:
                     if is_sensitive_url(r):
-                        print(f"{G}    - {highlight(r, R)}")
+                        print(f"{G}    - {highlight({r['value']}, R)} {Y}({p['page']}:{p['line']})")
                     else:
-                        print(f"{G}    - {W}{r}")
+                        print(f"{G}    - {W}{r['value']} {Y}({p['page']}:{p['line']})")
                     
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "apis",
                             "data": {
-                                "api_found": r
+                                "api_found": {r['value']},
+                                "page": s["page"],
+                                "line": s["line"]
                             }
                         })
                 print()
@@ -232,44 +261,54 @@ def process_target(args, target_url):
 
                 for key, values in data["sensitive_keywords"].items():
                     for v in values:
-                        print(f"{G}    -{W} ...{v}...")
+                        print(f"{G}    -{W} ...{v}... {Y}({p['page']}:{p['line']})")
 
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "sensitive_keyword",
                             "data": {
-                                "keyword_found": v
+                                "keyword_found": v,
+                                "page": page,
+                                "line": line
                             }
                         })
                 print()
 
             if data["sensitive_urls"]:
                 print(f"{G}[+] Sensitive urls")
-                for r in data["sensitive_urls"]:
-                    if is_sensitive_url(r):
-                        print(f"{G}    - {highlight(r, R)}")
+
+                for p in data["sensitive_urls"]:
+                    url = p["value"]
+
+                    if is_sensitive_url(url):
+                        print(f"{G}    - {highlight(url, R)} {Y}({p['page']}:{p['line']})")
                     else:
-                        print(f"{G}    - {W}{r}")
-                        
+                        print(f"{G}    - {W}{url} {Y}({p['page']}:{p['line']})")
+
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "sensitive_urls",
                             "data": {
-                                "url_found": r
+                                "url_found": url,
+                                "page": p["page"],
+                                "line": p["line"]
                             }
                         })
+
                 print()
 
             if data.get("base64"):
                 print(f"{G}[+] BASE64 decoded content")
                 for b in data["base64"]:
-                    print(f"{G}    - {W}{b}")
+                    print(f"{G}    - {W}{b} {Y}({p['page']}:{p['line']})")
                     
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "base64_text",
                             "data": {
-                                "b64_found": b
+                                "b64_found": b,
+                                "page": page,
+                                "line": line
                             }
                         })
                 print()
@@ -508,7 +547,7 @@ def main():
     parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
-    parser.add_argument("--save", nargs="?", const=True, default=False, help="Save results as JSON (--save or --save filename)")
+    parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
     parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>")
     
     args = parser.parse_args()
@@ -583,7 +622,7 @@ def main():
         # -------------------------
         if args.save:
             if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                print(f"\n{Y}[!] {W}Generating the JSON report...")
+                print(f"\n{Y}[!] {W}Generating the JSON repor...")
                 filename = save_report(args)
                 print(f"{G}[+] {W}Report saved to {filename}")
 
