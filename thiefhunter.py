@@ -259,19 +259,19 @@ def process_target(args, target_url):
             if data["sensitive_keywords"]:
                 print(f"{G}[+] Sensitive keywords")
 
-                for key, values in data["sensitive_keywords"].items():
-                    for v in values:
-                        print(f"{G}    -{W} ...{v}... {Y}({p['page']}:{p['line']})")
+                for r in data["sensitive_keywords"]:
+                    print(f"{G}    - {W}{r['value']} {Y}({r['page']}:{r['line']})")
 
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "sensitive_keyword",
                             "data": {
-                                "keyword_found": v,
-                                "page": page,
-                                "line": line
+                                "keyword_found": r["value"],
+                                "page": r["page"],
+                                "line": r["line"]
                             }
                         })
+
                 print()
 
             if data["sensitive_urls"]:
