@@ -603,7 +603,7 @@ def wtf_scan(start_url, args, max_depth=2):
     found_phones = list()
     found_secrets = list()
     found_apis = list()
-    found_sensitive_keywords = {}
+    found_sensitive_keywords = []
     found_sensitive_urls = list()
     found_subdomains = set()
     found_base64 = list()
@@ -676,8 +676,12 @@ def wtf_scan(start_url, args, max_depth=2):
             )
 
             for key, values in results.items():
-                found_sensitive_keywords.setdefault(key, [])
-                found_sensitive_keywords[key].extend(values)
+                for value in values:
+                    found_sensitive_keywords.append({
+                        "value": value,
+                        "page": url,
+                        "line": 0
+                    })
 
             links = re.findall(r'(?:href|src)=["\'](.*?)["\']', text)
             for u in scan_sensitive_urls(links):
