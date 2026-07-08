@@ -160,14 +160,15 @@ def get_request(args, url, **kwargs):
             proxies=proxies,
             timeout=kwargs.get("timeout", args.timeout),
             verify=kwargs.get("verify", False),
-            allow_redirects=kwargs.get("allow_redirects", True)
+            allow_redirects=kwargs.get("allow_redirects", True),
+            auth=kwargs.get("auth")
         )
         return response
     except requests.exceptions.ConnectionError:
         return None
 
     except requests.exceptions.ConnectTimeout:
-        return None
+        return "timeout"
 
     except requests.exceptions.ReadTimeout:
         return "timeout"
