@@ -25,6 +25,7 @@ from Dependencies.github_commits.commits import repos
 from Dependencies.TLD.tld_enum import tld_main
 from Dependencies.dir_enum.dir_files_scan import do_fuzz_paths
 from Dependencies.do403_bypass.fuzzer_403 import do_403
+from Dependencies.auth_401.basic_auth import fuzz_auth
 
 
 def handle_exit(sig, frame):
@@ -75,6 +76,7 @@ def process_target(args, target_url):
     # GITHUB COMMITS
     # -------------------------
     if local_args.commits:
+        isargsok(local_args, "need_commit")
         repos(args, local_args.commits)
 
 
@@ -515,6 +517,15 @@ def process_target(args, target_url):
             tld_main(local_args)
 
 
+    # -------------------------
+    # BASIC AUTH FUZZER (401)
+    # -------------------------
+    if local_args.basicauth:
+        print(f"\n{Y}[!] Basic auth on {C}{args.url}")
+        isargsok(local_args, "need_fuzzer")
+        fuzz_auth(args)
+
+
 
 
 def main():
@@ -548,6 +559,11 @@ def main():
     parser.add_argument("--crlf", action="store_true", help="Try to detect crlf injections")
     parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
+    parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires both -U/--user and -P/--password")
+    parser.add_argument("-U", "--user", help="username or @usernames_filepath")
+    parser.add_argument("-P", "--password", help="password or @passwords_filepath")
+
+    
     parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
     parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
     parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>")
