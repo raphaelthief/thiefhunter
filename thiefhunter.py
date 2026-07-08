@@ -522,8 +522,8 @@ def process_target(args, target_url):
     # -------------------------
     if local_args.basicauth:
         print(f"\n{Y}[!] Basic auth on {C}{args.url}")
-        isargsok(local_args, "need_fuzzer")
-        fuzz_auth(args)
+        if isargsok(local_args, "need_fuzzer"):
+            fuzz_auth(args)
 
 
 
