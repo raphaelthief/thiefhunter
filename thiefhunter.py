@@ -300,15 +300,17 @@ def process_target(args, target_url):
             if data.get("base64"):
                 print(f"{G}[+] BASE64 decoded content")
                 for b in data["base64"]:
-                    print(f"{G}    - {W}{b} {Y}({p['page']}:{p['line']})")
-                    
+                    print(
+                        f"{G}    - {W}{b['value']} {Y}({b['page']}:{b['line']})"
+                    )
+
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "base64_text",
                             "data": {
-                                "b64_found": b,
-                                "page": page,
-                                "line": line
+                                "b64_found": b["value"],
+                                "page": b["page"],
+                                "line": b["line"]
                             }
                         })
                 print()
