@@ -563,7 +563,7 @@ def isargsok(args, what):
             return False
             
     if what == "need_fuzzer":
-        if not (args.url or args.user or args.password):
+        if not (args.url and args.user and args.password):
             print(f"{R}[Error] args --url --user --password missing")
             print(f"{W}   --> Skipping...\n")
             return False
