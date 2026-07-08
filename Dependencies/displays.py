@@ -53,11 +53,6 @@ GENERAL OPTIONS
           Some modules internally override timeout values
           depending on request complexity or remote latency
 
-  {C}--save{G}
-      Save results as JSON output
-      Can be used as a flag (--save) or with a filename (--save file.json)
-      If no filename is provided, a default file name will be used based on args --url or --comit
-
 
 {Y}PROXY / NETWORK
 ───────────────────────────────────────────────────────────────────────{G}
@@ -455,6 +450,40 @@ GENERAL OPTIONS
           the person or the target’s technical teams create passwords
 
 
+{Y}BASIC AUTH FUZZING
+───────────────────────────────────────────────────────────────────────{G}
+ {C}--basic-auth{G}
+      Fuzz HTTP Basic Authentication credentials
+
+      Features:
+          - username/password wordlist support
+          - single credential testing
+          - HTTP Basic Auth header generation
+          - authentication response analysis
+          - valid credential detection
+          - WAF/firewall block detection
+          - request and response debugging
+          - fuzzing statistics and progress tracking
+
+      Usage:
+          Supports direct values or files:
+              --user admin
+              --password password
+
+          or wordlists:
+              --user @users.txt
+              --password @passwords.txt
+
+      Detection:
+          Identifies authentication differences based on:
+              - HTTP status codes
+              - server responses
+              - access behavior changes
+
+      Recommendation:
+          Use with --verbose for detailed request attempts and response analysis
+
+
 {Y}AUTOMATION
 ───────────────────────────────────────────────────────────────────────{G}
   {C}--batch{G}
@@ -498,6 +527,9 @@ GENERAL OPTIONS
   Open redirect testing:
       {Y}python3 thiefhunter.py -u "https://target.com/?redirect=test" --ord{G}
 
+  Basic Auth fuzzing:
+      {Y}python3 thiefhunter.py -u "https://target.com/login" --basicauth -U admin -P "@\path\to\your passwords.txt" --batch -v{G}
+
 {Y}═══════════════════════════════════════════════════════════════════════{G}
 '''
 
@@ -514,13 +546,13 @@ def highlight(text, color=R):
 def isargsok(args, what):
     if what == "need_url":
         if not args.url and not args.file:
-            print(f"{R}[Error] args --url or --file missingk")
+            print(f"{R}[Error] args --url or --file missing")
             print(f"{W}   --> Skipping...\n")
             return False
 
     if what == "need_commit":
         if not args.commit:
-            print(f"{R}[Error] args --commit missingk")
+            print(f"{R}[Error] args --commit missing")
             print(f"{W}   --> Skipping...\n")
             return False
 
@@ -529,6 +561,13 @@ def isargsok(args, what):
             print(f"{R}[Error] args --wayback missing")
             print(f"{W}   --> Skipping...\n")
             return False
+            
+    if what == "need_fuzzer":
+        if not (args.url or args.user or args.password):
+            print(f"{R}[Error] args --url --user --password missing")
+            print(f"{W}   --> Skipping...\n")
+            return False
+            
     return True
 
 def no_clean(args):
