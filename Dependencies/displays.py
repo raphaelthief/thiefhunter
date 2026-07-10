@@ -298,6 +298,23 @@ GENERAL OPTIONS
   {C}--tld{G}
       Enumerate a domain's DNS extensions to identify a related parent domain or detect the presence of clones
 
+  {C}--favicon{G}
+      Retrieves the target favicon and computes its MurmurHash3 (Shodan-compatible).
+
+      Displays:
+        - Favicon hash
+        - Shodan search filter
+        - Direct Shodan search URL
+        - Censys search URL
+
+      Useful for:
+        - Identifying related assets
+        - Finding servers sharing the same favicon
+        - Infrastructure reconnaissance
+
+      Example:
+        --url https://target.com --favicon
+
 
 {Y}VULNERABILITY ANALYSIS
 ───────────────────────────────────────────────────────────────────────{G}
