@@ -202,7 +202,7 @@ def probe_subdomains(args, subdomains: list, max_threads: int = 25, hide_suspici
         for scheme in ["https", "http"]:
             url = f"{scheme}://{sub}"
             try:
-                r = get_request(args, url)
+                r = get_request(args, url, allow_redirects = False)
 
                 if r is None:
                     continue
@@ -441,14 +441,13 @@ def get_subdomains(args, domain: str) -> list:
             https_url = f"https://{sub}"
             response = get_request(args, https_url, timeout=10)
             url = https_url
-            
+
             # -------------------------
             # Fallback HTTP
             # -------------------------
             if response is None:
                 http_url = f"http://{sub}"
                 response = get_request(args, http_url, timeout=10)
-
                 url = http_url
 
             # No response at all
@@ -537,7 +536,7 @@ def get_subdomains(args, domain: str) -> list:
             # -------------------------
             # Classic HTML login page
             # -------------------------
-            if status in [200, 401, 403]:
+            if status in [200, 401, 403]: # Final status code (including final redirections process)
                 if any(keyword in title for keyword in login_keywords):
                     suspicious = True
 
@@ -566,7 +565,19 @@ def get_subdomains(args, domain: str) -> list:
             elif "digest" in www_auth:
                 auth_type = " [HTTP DIGEST AUTH]"
 
-            print(f"{status_color}[{status}] {W}{url} {G}{'(LOGIN PAGE?)' if suspicious else ''}{C}{auth_type}")
+            # -------------------------
+            # Redirect display
+            # -------------------------
+            display_status = status
+            display_url = url
+            redirect_flag = ""
+
+            if response.history:
+                display_status = response.history[0].status_code
+                display_url = f"{url} {Y}--> {W}{response.url}"
+                redirect_flag = "[REDIRECT]"
+
+            print(f"{status_color}[{display_status}] {W}{display_url}{G}{' (LOGIN PAGE?)' if suspicious else ''}{C}{auth_type} {redirect_flag}")
             
             if args.save:
                 add_result("Subdomains", {
