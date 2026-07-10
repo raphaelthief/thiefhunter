@@ -23,9 +23,9 @@ def whatfavicon(args):
         hash_found = mmh3.hash(favicon)
         
         print(f"{G}[+] Hash          : {C}{hash_found}")
-        print(f"{G}[+] shodan filter : {C}http.favicon.hash:{hash_found}")
+        print(f"{G}[+] Shodan filter : {C}http.favicon.hash:{hash_found}")
         print(f"{G}[+] Shodan        : {C}https://www.shodan.io/search?query=http.favicon.hash%3A{hash_found}")
-        print(f"{G}[+] Shodan        : {C}https://platform.censys.io/search?q=web.endpoints.http.favicons.hash_shodan%3D%22{hash_found}%22")
+        print(f"{G}[+] Censys        : {C}https://platform.censys.io/search?q=web.endpoints.http.favicons.hash_shodan%3D%22{hash_found}%22")
 
     except Exception as e:
         handle_error(e, "ERROR", args.verbose)
