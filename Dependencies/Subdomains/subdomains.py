@@ -1,6 +1,7 @@
-import os, time
+import os, time, re
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.get_request import get_request
 from Dependencies.save_output import add_result
@@ -290,34 +291,35 @@ def get_subdomains(args, domain: str) -> list:
     # -------------------------
     # 2. CRT.SH
     # -------------------------
-    try:
-        print(f"{G}[+] Searching on crt.sh ...")
-        crt_data = fetch_crtsh(args, domain)
-        for entry in crt_data:
-            name_value = entry.get("name_value", "")
-            for sub in name_value.split("\n"):
-                sub = sub.strip()
-                if not sub or "*" in sub:
-                    continue
+    if API_KEY:
+        try:
+            print(f"{G}[+] Searching on crt.sh ...")
+            crt_data = fetch_crtsh(args, domain)
+            for entry in crt_data:
+                name_value = entry.get("name_value", "")
+                for sub in name_value.split("\n"):
+                    sub = sub.strip()
+                    if not sub or "*" in sub:
+                        continue
 
-                if sub not in results:
-                    results[sub] = {
-                        "subdomain": sub,
-                        "ip": "N/A",
-                        "asn_name": "(CRT.sh)"
-                    }
-                    if args.save:
-                        add_result("Subdomains", {
-                            "type": "crt.sh",
-                            "data": {
-                                "source": "crtsh",
-                                "subdomain": sub,
-                                "ip": "N/A"
-                            }
-                        })
-    except Exception as e:
-        handle_error(e, "ERROR", args.verbose)
-        pass
+                    if sub not in results:
+                        results[sub] = {
+                            "subdomain": sub,
+                            "ip": "N/A",
+                            "asn_name": "(CRT.sh)"
+                        }
+                        if args.save:
+                            add_result("Subdomains", {
+                                "type": "crt.sh",
+                                "data": {
+                                    "source": "crtsh",
+                                    "subdomain": sub,
+                                    "ip": "N/A"
+                                }
+                            })
+        except Exception as e:
+            handle_error(e, "ERROR", args.verbose)
+            pass
 
     # -------------------------
     # 3. VirusTotal
@@ -364,7 +366,8 @@ def get_subdomains(args, domain: str) -> list:
         if test_sub in results:
             continue
         to_probe.append(test_sub)
-        
+    
+    
     probe_results = probe_subdomains(args, to_probe)
     for sub, result in probe_results.items():
         results[sub] = {
@@ -425,7 +428,7 @@ def get_subdomains(args, domain: str) -> list:
         check_access = input(f"\n{Y}[?] Do you want to test access to discovered subdomains? (y/n): {C}").strip().lower()
         
     if check_access in ["y", "yes"]:
-        print(f"{G}[+] Testing HTTP access on discovered subdomains ...")
+        print(f"{G}[+] Testing HTTP access on discovered subdomains...")
         for entry in displayed_subdomains:
             if entry.get("status") == 404:
                 continue
@@ -438,7 +441,7 @@ def get_subdomains(args, domain: str) -> list:
             https_url = f"https://{sub}"
             response = get_request(args, https_url, timeout=10)
             url = https_url
-
+            
             # -------------------------
             # Fallback HTTP
             # -------------------------
@@ -458,10 +461,67 @@ def get_subdomains(args, domain: str) -> list:
                 continue
 
 
+            
             suspicious = False
             title = response.text.lower()
             headers = response.headers
             status = response.status_code
+
+            host_pattern = re.compile(rf"\b(?:[a-zA-Z0-9_-]+\.)+{re.escape(domain)}\b", re.IGNORECASE)
+            found_hosts = set()
+
+            # -------------------------
+            # HTML
+            # -------------------------
+            found_hosts.update(host_pattern.findall(response.text))
+
+            # -------------------------
+            # Headers
+            # -------------------------
+            for value in response.headers.values():
+                if isinstance(value, str):
+                    found_hosts.update(host_pattern.findall(value))
+
+            # -------------------------
+            # redirection urls
+            # -------------------------
+            for r in response.history:
+                host = urlparse(r.url).hostname
+                if host and host.endswith(domain):
+                    found_hosts.add(host)
+
+            host = urlparse(response.url).hostname
+            if host and host.endswith(domain):
+                found_hosts.add(host)
+
+            # -------------------------
+            # Add to results
+            # -------------------------
+            for host in sorted(found_hosts):
+                if host == domain:
+                    continue
+
+                if host not in results:
+                    results[host] = {
+                        "subdomain": host,
+                        "ip": "N/A",
+                        "asn_name": "(HTML)"
+                    }
+
+                    displayed_subdomains.append(results[host])
+                    print(f"{Y}[DISCOVERED] {W}{host}")
+
+                    if args.save:
+                        add_result("Subdomains", {
+                            "type": "HTML",
+                            "data": {
+                                "source": "page",
+                                "subdomain": host
+                            }
+                        })
+
+
+
             www_auth = str(headers.get("WWW-Authenticate", "")).lower()
             login_keywords = [
                 "login",
