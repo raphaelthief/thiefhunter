@@ -2,6 +2,8 @@ import tldextract
 from urllib.parse import urlparse, parse_qs
 
 def extract_domain(url):
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
     parsed = urlparse(url)
     return parsed.netloc
 
