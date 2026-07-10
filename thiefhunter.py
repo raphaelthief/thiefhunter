@@ -21,6 +21,7 @@ from Dependencies.Audit.basic_checks import auditor
 from Dependencies.Audit.ssl_checks import ssl_that
 from Dependencies.crlf.crlf_headers import crlf_test
 from Dependencies.waf_detection.waf_detect import whatwaf
+from Dependencies.favicon_hash.favicon_osint import whatfavicon
 from Dependencies.github_commits.commits import repos
 from Dependencies.TLD.tld_enum import tld_main
 from Dependencies.dir_enum.dir_files_scan import do_fuzz_paths
@@ -510,6 +511,14 @@ def process_target(args, target_url):
 
 
     # -------------------------
+    # FAVICON
+    # -------------------------
+    if local_args.favicon:
+        if isargsok(local_args, "need_url"):
+            whatfavicon(local_args)
+
+
+    # -------------------------
     # TLD enum
     # -------------------------
     if local_args.tld:
@@ -524,7 +533,6 @@ def process_target(args, target_url):
         print(f"\n{Y}[!] Basic auth on {C}{args.url}")
         if isargsok(local_args, "need_fuzzer"):
             fuzz_auth(args)
-
 
 
 
@@ -558,6 +566,7 @@ def main():
     parser.add_argument("--ord", "--open-redirect", dest="open_redirect", action="store_true", help="Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
     parser.add_argument("--crlf", action="store_true", help="Try to detect crlf injections")
     parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
+    parser.add_argument("--favicon", action="store_true", help="Try to detect favicon hash")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires both -U/--user and -P/--password")
     parser.add_argument("-U", "--user", help="username or @usernames_filepath")
