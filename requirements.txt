@@ -17,3 +17,4 @@ tldextract
 urllib3
 packaging
 tqdm
+mmh3
