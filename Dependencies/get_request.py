@@ -1,7 +1,17 @@
-import requests, random, socket, ssl, socks
+import requests, random, socket, ssl, socks, threading
 from pathlib import Path
 from urllib.parse import urlparse
+from tqdm import tqdm
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
+
+
+# =========================================================
+# Rate limiting or WAF detection for enumerations (Connection aborted errors)
+# =========================================================
+_connection_abort_count = 0
+_connection_warning_shown = False
+_lock = threading.Lock()
+
 
 # =========================================================
 # DEFAUT & RANDOM HEADERS
@@ -120,6 +130,7 @@ def get_request(args, url, **kwargs):
     # --- HEADERS ---
     #parsed_headers = parse_headers(args.headers)
     #final_headers = {**DEFAULT_HEADERS, **parsed_headers}
+
     final_headers = build_headers(args)
 
     # MERGE HEADERS FROM KWARGS
@@ -128,6 +139,8 @@ def get_request(args, url, **kwargs):
 
     # --- COOKIES ---
     final_cookies = parse_cookies(args.cookies)
+    extra_cookies = kwargs.get("cookies", {})
+    final_cookies.update(extra_cookies)
 
     # --- PROXY LOGIC ---
     proxies = None
@@ -136,7 +149,7 @@ def get_request(args, url, **kwargs):
         proxies = SOCKS_PROXY
 
     elif args.proxy:
-        active_proxy = args.proxy.strip()
+        active_proxy = args.proxy.strip().rstrip("/")
         if active_proxy.lower() == "socks":
             proxies = SOCKS_PROXY
 
@@ -147,14 +160,18 @@ def get_request(args, url, **kwargs):
             }
 
     # --- METHOD ---
-    method = getattr(args, "method", "GET").upper()
-
+    #method = getattr(args, "method", "GET").upper()
+    method = kwargs.get("method", getattr(args, "method", "GET")).upper()
+    
     # --- REQUEST ---
     try:
         response = requests.request(
             method=method,
             url=url,
             params=kwargs.get("params", getattr(args, "params", None)),
+            data=kwargs.get("data"),
+            json=kwargs.get("json"),
+            files=kwargs.get("files"),
             headers=final_headers,
             cookies=final_cookies,
             proxies=proxies,
@@ -163,14 +180,32 @@ def get_request(args, url, **kwargs):
             allow_redirects=kwargs.get("allow_redirects", True),
             auth=kwargs.get("auth")
         )
+        
         return response
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        global _connection_abort_count, _connection_warning_shown
+        
+        if "Remote end closed connection without response" in str(e):
+            with _lock:
+                _connection_abort_count += 1
+                if (_connection_abort_count >= 5 and not _connection_warning_shown):
+                    tqdm.write(f"{Y}{'─' * 40}{W}")
+                    tqdm.write(f"{Y}[WARNING]{W} The server repeatedly closed the connection ({R}{_connection_abort_count} times{W})")
+                    tqdm.write("Possible causes:")
+                    tqdm.write("  • Anti-bot protection (Cloudflare, WAF, ...)")
+                    tqdm.write("  • Rate limiting")
+                    tqdm.write("  • Reverse proxy or firewall")
+                    tqdm.write("  • Server-side connection policy")
+                    tqdm.write(f"{Y}Results may be incomplete.{W}")
+                    tqdm.write(f"{Y}{'─' * 40}{W}")
+                    _connection_warning_shown = True
         return None
 
     except requests.exceptions.ConnectTimeout:
         return "timeout"
 
-    except requests.exceptions.ReadTimeout:
+    except requests.exceptions.ReadTimeout as e:
+        handle_error(e, "READ TIMEOUT", args.verbose)
         return "timeout"
 
     except Exception as e:
