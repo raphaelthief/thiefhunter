@@ -21,7 +21,7 @@ banner = rf'''
                                          {Y}<{C}raphaelthief{Y}>{G}               
 '''
 
-help_menu = f'''
+help_menu = fr'''
 {Y}═══════════════════════════════════════════════════════════════════════
             {C}Automated Bug Hunting and Pentesting Tool   █{W}█{R}█
 {Y}═══════════════════════════════════════════════════════════════════════
@@ -501,6 +501,58 @@ GENERAL OPTIONS
           Use with --verbose for detailed request attempts and response analysis
 
 
+{Y}WORDPRESS FUZZING
+───────────────────────────────────────────────────────────────────────{G}
+ {C}--wordpress{G}
+      Enumerate WordPress users and test authentication methods
+
+      Features:
+          - WordPress user enumeration
+          - REST API user discovery
+          - author ID enumeration (?author=)
+          - author sitemap enumeration
+          - oEmbed user detection
+          - WordPress version detection
+          - XML-RPC detection
+          - system.multicall vulnerability detection (< WordPress 4.4)
+          - wp-login.php authentication
+          - XML-RPC authentication
+          - adaptive rate limiting
+          - WAF/firewall detection
+          - progress tracking
+          - single credentials or wordlists
+          - automatic authentication method selection
+
+      Usage:
+          Enumeration only:
+              --wordpress / -wp
+
+          Test a single account:
+              --wordpress --user admin --password password123
+
+          Use wordlists both usernames and passwords:
+              --wordpress --user @file/to/users.txt --password @file/to/passwords.txt
+
+          Use wordlists with one username:
+              --wordpress --user admin --password @file/to/passwords.txt
+
+      Detection:
+          Enumerates users using:
+              - REST API endpoints
+              - oEmbed endpoint
+              - author archives
+              - author sitemaps
+
+          Detects authentication surface:
+              - wp-login.php
+              - xmlrpc.php
+              - system.multicall availability
+
+      Recommendation:
+          Use with --verbose to display every endpoint, request,
+          detected authentication method and WordPress version.
+
+
 {Y}AUTOMATION
 ───────────────────────────────────────────────────────────────────────{G}
   {C}--batch{G}
@@ -585,6 +637,18 @@ def isargsok(args, what):
             print(f"{W}   --> Skipping...\n")
             return False
             
+    if what == "need_fuzzer_wp":
+        if not args.url:
+            print(f"{R}[Error] args --url missing")
+            print(f"{W}   --> Skipping...\n")
+            return False
+            
+        if args.user:    
+            if not args.password:
+                print(f"{R}[Error] args --password missing")
+                print(f"{W}   --> Skipping...\n")
+                return False
+                
     return True
 
 def no_clean(args):
