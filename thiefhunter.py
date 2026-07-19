@@ -27,6 +27,7 @@ from Dependencies.TLD.tld_enum import tld_main
 from Dependencies.dir_enum.dir_files_scan import do_fuzz_paths
 from Dependencies.do403_bypass.fuzzer_403 import do_403
 from Dependencies.auth_401.basic_auth import fuzz_auth
+from Dependencies.Wordpress_auth.automated_wordpress_bruteforce import wordpress_fuzz
 
 
 def handle_exit(sig, frame):
@@ -244,17 +245,17 @@ def process_target(args, target_url):
                 print(f"{G}[+] APIs")
                 for r in data["apis"]:
                     if is_sensitive_url(r):
-                        print(f"{G}    - {highlight({r['value']}, R)} {Y}({p['page']}:{p['line']})")
+                        print(f"{G}    - {highlight({r['value']}, R)} {Y}({r['page']}:{r['line']})")
                     else:
-                        print(f"{G}    - {W}{r['value']} {Y}({p['page']}:{p['line']})")
+                        print(f"{G}    - {W}{r['value']} {Y}({r['page']}:{r['line']})")
                     
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "apis",
                             "data": {
                                 "api_found": {r['value']},
-                                "page": s["page"],
-                                "line": s["line"]
+                                "page": r["page"],
+                                "line": r["line"]
                             }
                         })
                 print()
@@ -535,6 +536,15 @@ def process_target(args, target_url):
             fuzz_auth(args)
 
 
+    # -------------------------
+    # WORDPRESS FUZZER (login)
+    # -------------------------
+    if local_args.wordpress:
+        print(f"\n{Y}[!] Wordpress auth fuzzer on {args.url}")
+        if isargsok(local_args, "need_fuzzer_wp"):
+            wordpress_fuzz(args)
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="Automated Bug Hunting and Pentesting Tool")
@@ -569,10 +579,9 @@ def main():
     parser.add_argument("--favicon", action="store_true", help="Try to detect favicon hash")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires both -U/--user and -P/--password")
+    parser.add_argument("-wp", "--wordpress", action="store_true", help="Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.")
     parser.add_argument("-U", "--user", help="username or @usernames_filepath")
     parser.add_argument("-P", "--password", help="password or @passwords_filepath")
-
-    
     parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
     parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
     parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>")
