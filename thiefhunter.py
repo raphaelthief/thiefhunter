@@ -584,7 +584,7 @@ def main():
     parser.add_argument("-P", "--password", help="password or @passwords_filepath")
     parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
     parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
-    parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>")
+    parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>)")
     
     args = parser.parse_args()
     
