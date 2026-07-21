@@ -620,7 +620,7 @@ def isargsok(args, what):
             return False
 
     if what == "need_commit":
-        if not args.commit:
+        if not args.commits:
             print(f"{R}[Error] args --commit missing")
             print(f"{W}   --> Skipping...\n")
             return False
