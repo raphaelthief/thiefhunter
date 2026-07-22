@@ -1,4 +1,4 @@
-import os, random, string, re
+import os, random, string, re, json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from pathlib import Path
@@ -14,10 +14,16 @@ WORDLISTS = {
     "wordpress.txt": 1,
 
     "api_endpoints.txt": 2,
+    "graphql.txt": 2,
     
     "db_backups_files.txt": 3,
     
     "swagger.txt": 4,
+}
+
+
+POST_TEMPLATES = {
+    "graphql.txt": "graphql",
 }
 
 
@@ -197,7 +203,54 @@ def analyze_response(target, response):
 
 
 
-def worker(args, base_url, path, baseline):
+def load_templates(template_name):
+    template_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "Payloads",
+        "dir_enum",
+        "post_requests"
+    )
+
+    filepath = os.path.join(template_dir, f"{template_name}.json")
+    if not os.path.exists(filepath):
+        return []
+
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        return data.get("templates", [])
+
+    except Exception:
+        return []
+
+
+def execute_templates(args, target, template_name):
+    templates = load_templates(template_name)
+    if not templates:
+        return
+        
+    if args.verbose:
+        tqdm.write(f"{G}[*] {W}Loading POST requests templates")
+        tqdm.write(f"{G}[*] {W}Loaded {len(templates)} templates for {template_name}")
+        
+    for template in templates:
+        try:
+            response = get_request(args, target, method=template.get("method", "POST"), headers=template.get("headers", {}), json=template.get("body"), timeout=30, allow_redirects=False)
+            if not response or response == "timeout":
+                continue
+            
+            tqdm.write(f"{R}[{response.status_code}] {W}{target} (POST) -> {template['name']}")
+            if args.verbose:
+                tqdm.write(f"      {G}-> {json.dumps(template['body'], ensure_ascii=False)}{W}")                
+                
+        except Exception as e:
+            handle_error(e, "ERROR", args.verbose)
+
+
+
+def worker(args, base_url, path, baseline, template=None):
     try:
         if not path.startswith('/'):
             path = f"/{path}"
@@ -244,6 +297,9 @@ def worker(args, base_url, path, baseline):
                     }
                 })
             analyze_response(target, response)
+            if template:
+                execute_templates(args, target, template)
+                
         elif status == 201:
             tqdm.write(f"{Y}[201]{W} {target}")
             if args.save:
@@ -337,7 +393,7 @@ def do_fuzz_paths(args):
         if parsed.path and parsed.path != '/':
             base_url = f"{base_url}{parsed.path.lstrip('/')}"
 
-        print(f"\n{C}[+] Fuzzing paths on: {base_url}")
+        tqdm.write(f"\n{C}[+] Fuzzing paths on: {base_url}")
 
         # 2. Load Wordlist
         payloads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Payloads", "dir_enum")
@@ -348,6 +404,7 @@ def do_fuzz_paths(args):
         ]
 
         paths = []
+        path_templates = {}
         for filename in selected_files:
             filepath = os.path.join(payloads_dir, filename)
 
@@ -357,7 +414,15 @@ def do_fuzz_paths(args):
 
             try:
                 entries = Path(filepath).read_text(encoding="utf-8").splitlines()
-                paths.extend(p.strip() for p in entries if p.strip())
+                for entry in entries:
+                    entry = entry.strip()
+
+                    if not entry:
+                        continue
+
+                    paths.append(entry)
+                    if filename in POST_TEMPLATES:
+                        path_templates[entry] = POST_TEMPLATES[filename]
 
                 if args.verbose:
                     tqdm.write(f"{G}[*]{W} Loaded {filename}")
@@ -368,13 +433,12 @@ def do_fuzz_paths(args):
         paths = list(dict.fromkeys(paths))
         
         if args.verbose:
-            print(f"{G}[*]{W} Loaded {len(paths)} unique paths from {len(selected_files)} wordlists")
-
+            tqdm.write(f"{G}[*]{W} Loaded {len(paths)} unique paths from {len(selected_files)} wordlists")
 
         # 3. Calculate Baseline (Soft 404 Detection)
-        print(f"{G}[*]{W} Calculating baseline (soft 404 detection)...")
+        tqdm.write(f"{G}[*]{W} Calculating baseline (soft 404 detection)...")
         baseline = get_baseline(args, base_url)
-        print(f"{G}[*]{W} Baseline detected -> Status: {Y}{baseline[0]}{W}, Length: {Y}{baseline[1]}{W}, Words: {Y}{baseline[2]}")
+        tqdm.write(f"{G}[*]{W} Baseline detected -> Status: {Y}{baseline[0]}{W}, Length: {Y}{baseline[1]}{W}, Words: {Y}{baseline[2]}")
         if args.save:
             add_result("Directory_Enumeration", {
                 "Type": "Baseline",
@@ -386,10 +450,10 @@ def do_fuzz_paths(args):
             })
 
         # 4. Check robots.txt Disallow
-        print(f"{G}[*]{W} Checking robots.txt...")
+        tqdm.write(f"{G}[*]{W} Checking robots.txt...")
         robots_paths = get_robots_paths(args, base_url)
         if robots_paths:
-            print(f"{G}[*]{W} Found {len(robots_paths)} paths in robots.txt")
+            tqdm.write(f"{G}[*]{W} Found {len(robots_paths)} paths in robots.txt")
             if args.save:
                 add_result("Directory_Enumeration", {
                     "Type": "Robots_Disallow",
@@ -406,7 +470,7 @@ def do_fuzz_paths(args):
                 worker(args, base_url, path, baseline)
 
             if skipped:
-                print(f"{Y}[!]{W} Skipped {skipped} robots.txt entries containing '*'")
+                tqdm.write(f"{Y}[!]{W} Skipped {skipped} robots.txt entries containing '*'")
 
         
         # Special wordpress enum
@@ -414,7 +478,7 @@ def do_fuzz_paths(args):
 
         # 5. Execute Thread Pool
         with ThreadPoolExecutor(max_workers=25) as executor:
-            futures = [executor.submit(worker, args, base_url, path, baseline) for path in paths]
+            futures = [executor.submit(worker, args, base_url, path, baseline, path_templates.get(path)) for path in paths]
             for future in tqdm(
                 as_completed(futures),
                 total=len(futures),
@@ -426,12 +490,12 @@ def do_fuzz_paths(args):
         
         # 6. Process .listing enum
         if discovered_listings:
-            print(f"\n{R}[!]{W} {len(discovered_listings)} directory listing(s) found:")
+            tqdm.write(f"\n{R}[!]{W} {len(discovered_listings)} directory listing(s) found:")
             for listing in discovered_listings:
-                print(f"    {listing}")
+                tqdm.write(f"    {listing}")
 
             if args.batch:
-                print(f"\n{Y}[?] Explore discovered directory listings recursively? (y/n): {C}n")
+                tqdm.write(f"\n{Y}[?] Explore discovered directory listings recursively? (y/n): {C}n")
                 choice = "n"
             else:
                 choice = input(f"\n{Y}[?] Explore discovered directory listings recursively? (y/n): {C}").strip().lower()
