@@ -1,0 +1,40 @@
+{
+    "templates": [
+        {
+            "name": "graphql Basic Introspection",
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "body": {
+                "query": "query IntrospectionQuery {__schema{types{name}}}",
+                "variables": {},
+                "operationName": "IntrospectionQuery"
+            }
+        },
+        {
+            "name": "graphql Fields",
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "body": {
+                "query": "query IntrospectionQuery {__schema{types{name,fields{name}}}}",
+                "variables": {},
+                "operationName": "IntrospectionQuery"
+            }
+        },
+        {
+            "name": "graphql Full",
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "body": {
+                "query": "query IntrospectionQuery {__schema{types{name,fields{name,args{name}}}}}",
+                "variables": {},
+                "operationName": "IntrospectionQuery"
+            }
+        }
+    ]
+}
