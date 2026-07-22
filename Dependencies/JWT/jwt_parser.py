@@ -1,7 +1,7 @@
 import base64, json, re
 from datetime import datetime, timezone
 from colorama import init, Fore, Style
-from Dependencies.displays import M, W, R, Y, G, C
+from Dependencies.displays import M, W, R, Y, G, C, handle_error
 
 
 def b64url_decode(data: str):
