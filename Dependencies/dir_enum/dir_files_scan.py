@@ -14,6 +14,7 @@ WORDLISTS = {
     "wordpress.txt": 1,
 
     "api_endpoints.txt": 2,
+    "bootstrap_actuator.txt": 2,
     "graphql.txt": 2,
     
     "db_backups_files.txt": 3,
