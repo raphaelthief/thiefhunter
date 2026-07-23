@@ -1,5 +1,5 @@
 import time, requests, os
-from Dependencies.displays import M, W, R, Y, G, C
+from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from urllib.parse import urlparse, parse_qs
 
 def_timeout = 60
@@ -30,7 +30,7 @@ def should_exclude(url, exclude_ext):
             return True
     return False
 
-def wayback_urls(domain, exclude_ext=None, show_all=False):
+def wayback_urls(args, domain, exclude_ext=None, show_all=False):
     start_time = time.time()
     urls = set()
     total = 0
