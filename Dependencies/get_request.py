@@ -65,7 +65,7 @@ SOCKS_PROXY = { # h added for DNS resolution
     "https": "socks5h://127.0.0.1:9050",
 }
 
-def is_tor_working(timeout=20):
+def is_tor_working(timeout=30):
     try:
         r = requests.get(
             "https://check.torproject.org/api/ip",
@@ -245,7 +245,13 @@ def get_request_socket(args, url, headers=None):
         # =====================================================
         # BUILD RAW REQUEST
         # =====================================================
-        request = f"{method} {path} HTTP/1.1\r\n"
+        
+        if args.proxy and parsed.scheme == "http":
+            request = f"{method} {url} HTTP/1.1\r\n"
+        else:
+            request = f"{method} {path} HTTP/1.1\r\n"
+        
+        #request = f"{method} {path} HTTP/1.1\r\n"
         for k, v in final_headers.items():
             request += f"{k}: {v}\r\n"
 
@@ -254,31 +260,74 @@ def get_request_socket(args, url, headers=None):
         # =====================================================
         # SOCKET
         # =====================================================
-        timeout = getattr(args, "timeout", 15)
+        timeout = getattr(args, "timeout", 60)
+        connected = False
+        tls_established = False
 
         # --- TOR SOCKS5 ---
         if getattr(args, "tor", False):
             sock = socks.socksocket()
             sock.set_proxy(socks.SOCKS5, "127.0.0.1", 9050, rdns=True)
+            sock.settimeout(timeout)
 
+        # --- HTTP/HTTPS Proxy (Burp, ZAP, mitmproxy...) ---
+        elif getattr(args, "proxy", None):
+            proxy = args.proxy.replace("http://", "").replace("https://", "")
+            proxy_host, proxy_port = proxy.split(":")
+            proxy_port = int(proxy_port)
+
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect((proxy_host, proxy_port))
+            connected = True
+
+            # HTTPS -> HTTP CONNECT tunnel
+            if parsed.scheme == "https":
+                connect_req = (
+                    f"CONNECT {host}:{port} HTTP/1.1\r\n"
+                    f"Host: {host}:{port}\r\n"
+                    "Proxy-Connection: Keep-Alive\r\n"
+                    "\r\n"
+                )
+
+                sock.sendall(connect_req.encode())
+
+                resp = b""
+                while b"\r\n\r\n" not in resp:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    resp += chunk
+                
+                status = resp.split(b"\r\n", 1)[0]
+                if b"200" not in status:
+                    raise Exception(resp.decode(errors="ignore"))
+
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                sock = context.wrap_socket(sock, server_hostname=host)
+                tls_established = True
+
+        # --- Direct ---
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
+            sock.settimeout(timeout)
 
         # =====================================================
         # CONNECT
         # =====================================================
-        sock.connect((host, port))
+        if not connected:
+            sock.connect((host, port))
 
         # =====================================================
         # TLS
         # =====================================================
-        if parsed.scheme == "https":
+        if parsed.scheme == "https" and not tls_established:
             context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
 
-            # Better OPSEC than verify=False
-            context.check_hostname = True
-            context.verify_mode = ssl.CERT_REQUIRED
             sock = context.wrap_socket(sock, server_hostname=host)
 
         # =====================================================
