@@ -101,7 +101,7 @@ def process_target(args, target_url):
                     for ext in local_args.exclude.split(",")
                 ]
 
-            wayback_output, total, filtered = wayback_urls(extracted_domain, exclude_ext=exclude_ext, show_all=local_args.show_all)
+            wayback_output, total, filtered = wayback_urls(local_args, extracted_domain, exclude_ext=exclude_ext, show_all=local_args.show_all)
             for i, url in enumerate(wayback_output, 1):
                 print(f"{G}[{i:04}] {W}{url}")
                 if args.save:
