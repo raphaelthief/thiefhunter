@@ -1,7 +1,7 @@
 import argparse, sys, json, re, signal, base64, io
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import redirect_stdout
-from Dependencies.displays import isargsok, clear_screen, print_banner, help_menu, no_clean, M, W, R, Y, G, C, highlight, handle_error, init_env_file
+from Dependencies.displays import isargsok, clear_screen, print_banner, help_menu, no_clean, M, W, R, Y, G, C, highlight, handle_error, init_env_file, ensure_http
 from Dependencies.save_output import init_report, save_report, add_result
 from Dependencies.url_parse import extract_domain, extract_strictdomain, extract_params
 from Dependencies.JWT.jwt_parser import analyze_jwt, print_jwt_analysis, is_jwt
@@ -101,7 +101,7 @@ def process_target(args, target_url):
                     for ext in local_args.exclude.split(",")
                 ]
 
-            wayback_output, total, filtered = wayback_urls(local_args, extracted_domain, exclude_ext=exclude_ext, show_all=local_args.show_all)
+            wayback_output, total, filtered = wayback_urls(extracted_domain, exclude_ext=exclude_ext, show_all=local_args.show_all)
             for i, url in enumerate(wayback_output, 1):
                 print(f"{G}[{i:04}] {W}{url}")
                 if args.save:
@@ -610,7 +610,6 @@ def main():
         print(help_menu)
         exit(0)
 
-
     # -------------------------
     # Tor check
     # -------------------------
@@ -621,7 +620,7 @@ def main():
         try:
             with open(args.file, "r", encoding="utf-8") as f:
                 targets = [
-                    line.strip()
+                    ensure_http(line)
                     for line in f
                     if line.strip()
                 ]
@@ -642,7 +641,7 @@ def main():
         # -------------------------
         for target in targets:
             if not target.startswith(("http://", "https://")):
-                print(f"{R}[-] Invalid URL: {target}")
+                print(f"{R}[-] Invalid URL: {target}") # no need now but still there
                 continue
 
             try:
@@ -676,7 +675,7 @@ def main():
         # -------------------------
         # Single mode
         # -------------------------
-        process_target(args, args.url)
+        process_target(args, ensure_http(args.url))
 
         # -------------------------
         # Save Output (end)
