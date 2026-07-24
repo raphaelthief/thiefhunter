@@ -675,8 +675,11 @@ def main():
         # -------------------------
         # Single mode
         # -------------------------
-        process_target(args, ensure_http(args.url))
-
+        if args.url:
+            process_target(args, ensure_http(args.url))
+        else:
+            process_target(args, None)
+    
         # -------------------------
         # Save Output (end)
         # -------------------------
