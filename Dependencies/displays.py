@@ -673,6 +673,12 @@ def handle_error(e, context=None, verbose=False):
         print(f"{prefix}{error_type}: {W}{error_message}{W}")
 
 
+def ensure_http(url: str) -> str:
+    if not url.startswith(("http://", "https://")):
+        return "https://" + url
+    return url
+
+
 def init_env_file(args):
     env_content = """\
 DNSDUMPSTER_API_KEY=
