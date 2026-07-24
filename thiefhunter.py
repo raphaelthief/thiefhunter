@@ -1,699 +1,693 @@
-import os, traceback
-from colorama import init, Fore, Style
-from pathlib import Path
-
-
-M = Fore.MAGENTA
-W = Fore.WHITE
-R = Fore.RED
-Y = Fore.YELLOW
-G = Fore.GREEN
-C = Fore.CYAN
-
-
-banner = rf'''
-
-{C} _   _     _       __ {W} _                 {R} _            
-{C}| |_| |__ (_) ___ / _|{W}| |__  _   _ _ __  {R}| |_ ___ _ __ 
-{C}| __| '_ \| |/ _ \ |_ {W}| '_ \| | | | '_ \ {R}| __/ _ \ '__|
-{C}| |_| | | | |  __/  _|{W}| | | | |_| | | | |{R}| ||  __/ |   
-{C} \__|_| |_|_|\___|_|  {W}|_| |_|\__,_|_| |_|{R} \__\___|_| {Y}v2   
-                                         {Y}<{C}raphaelthief{Y}>{G}               
-'''
-
-help_menu = fr'''
-{Y}═══════════════════════════════════════════════════════════════════════
-            {C}Automated Bug Hunting and Pentesting Tool   █{W}█{R}█
-{Y}═══════════════════════════════════════════════════════════════════════
-
-{G}Usage:
-    {Y}python3 thiefhunter.py [options]
-
-
-GENERAL OPTIONS
-───────────────────────────────────────────────────────────────────────{G}
-  {C}-h, --help{G}
-      Show default help menu
-
-  {C}-hh{G}
-      Show advanced help menu with examples and notes
-
-  {C}-nc, --no-clean{G}
-      Do not clean the CLI screen before execution
-      Keep previous terminal outputs and commands visible
-
-  {C}-v, --verbose{G}
-      Enable verbose/debug output
-      Useful for troubleshooting, stack traces and file locations
-
-  {C}-t, --timeout <seconds>{G}
-      HTTP request timeout (default: 15)
-
-      Notes:
-          Some modules internally override timeout values
-          depending on request complexity or remote latency
-
-
-{Y}PROXY / NETWORK
-───────────────────────────────────────────────────────────────────────{G}
-  {C}-p, --proxy <proxy>{G}
-      Use custom proxy
-
-      Examples:
-          --proxy http://127.0.0.1:8080
-          --proxy http://user:pass@host:port
-
-      Features:
-          - Supports HTTP/HTTPS proxies
-          - SOCKS proxies supported through dependencies
-          - DNS resolution through proxy when possible
-          - Reduces DNS leak risks
-
-      Warning:
-          Some enterprise environments may require
-          local DNS resolution outside the proxy
-
-  {C}--tor{G}
-      Force Tor SOCKS proxy usage
-
-      Default:
-          127.0.0.1:9050
-
-      Notes:
-          - Requires Tor service running locally
-          - Uses SOCKS5h to avoid DNS leaks
-          - If Tor runs on another port, edit:
-                Dependencies/get_request.py
-
-
-{Y}TARGETS
-───────────────────────────────────────────────────────────────────────{G}
-  {C}-u, --url <url>{G}
-      Single target URL
-
-      Example:
-          -u https://target.com
-
-  {C}-f, --file <file>{G}
-      File containing multiple targets
-
-      Supported format:
-          One URL per line
-
-      Example:
-          -f targets.txt
-
-
-{Y}REQUEST CUSTOMIZATION
-───────────────────────────────────────────────────────────────────────{G}
-  {C}--random-headers{G}
-      Use random User-Agent headers from payload files
-
-      Useful for:
-          - bypassing weak protections
-          - avoiding repetitive fingerprints
-          - testing detection capabilities
-          - reducing correlation between requests
-
-  {C}--headers "Header=Value,Header2=Value2"{G}
-      Custom HTTP headers
-
-      Example:
-          --headers "Authorization=Bearer TOKEN,Accept=application/json"
-
-  {C}-c, --cookies "name=value,name2=value2"{G}
-      Custom cookies
-
-      Example:
-          --cookies "session=abc123,token=xyz"
-
-  {C}-X, --method GET,POST,PUT,DELETE{G}
-      HTTP method
-
-      Default:
-          GET
-
-
-{Y}JWT ANALYSIS
-───────────────────────────────────────────────────────────────────────{G}
-  {C}--jwt <token>{G}
-      Analyze, mutate and validate JWT Bearer Tokens
-
-      Supported algorithms:
-          - HS256 / HS384 / HS512
-          - RS256 / RS384 / RS512
-          - ES256 / ES384 / ES512
-          - EdDSA
-
-      Features:
-          - Decode JWT header and payload
-          - Detect weak algorithms
-          - Check expiration and timestamps
-          - Detect "alg:none" usage
-          - Identify common JWT misconfigurations
-          - Detect JWT family automatically
-          - Interactive attack playground
-          - Generate malicious JWT variations
-          - Re-sign modified payloads
-          - Generate embedded JWK tokens
-          - Generate Hashcat cracking commands
-          - Test algorithm confusion vectors
-          - Test kid/jku/x5u header injections
-
-      Supported attack vectors:
-          - payload mutation (invalid signature)
-          - payload mutation (re-sign)
-          - alg:none bypass
-          - alg case fuzzing
-          - kid path traversal
-          - kid NULL byte injection
-          - jku injection
-          - x5u injection
-          - embedded JWK injection
-          - RS256 -> HS256 confusion
-          - offline HMAC cracking support
-
-      Notes:
-          - RSA confusion attacks require public key input
-          - Re-sign attacks require secret/private key
-          - Hashcat mode used:
-                16500
-          - Interactive prompts are displayed when
-            additional user input is required
-
-      Example:
-          --jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-      Example with vulnerable RS256 target:
-          python3 thiefhunter.py --jwt TOKEN
-
-      Example hashcat attack:
-          hashcat -m 16500 JWT_TOKEN rockyou.txt --force
-
-
-{Y}RECON / ENUMERATION
-───────────────────────────────────────────────────────────────────────{G}
-  {C}-e, --extract <depth>{G}
-      Crawl and extract URLs containing parameters
-
-      Features:
-          - Recursive crawling
-          - Parameterized endpoint extraction
-          - Static assets filtering
-          - Image/media exclusion by default
-
-      Example:
-          --extract 2
-
-  {C}-w, --wayback{G}
-      Extract URLs from Wayback Machine archives
-
-  {C}--exclude <ext1,ext2>{G}
-      Exclude extensions from Wayback results
-
-      Example:
-          --exclude png,jpg,css,js
-
-  {C}--show-all{G}
-      Show all Wayback URLs
-
-      Default behavior:
-          Only parameterized URLs are displayed
-
-      Useful for:
-          - discovering deprecated endpoints
-          - old admin panels
-          - forgotten APIs
-          - hidden resources
-
-  {C}--wtf <depth>{G}
-      Deep scan for exposed information
-
-      Extracts:
-          - emails
-          - phone numbers (french numbers 06/07)
-          - API keys
-          - secrets
-          - tokens
-          - robots.txt entries
-
-      Useful for:
-          - frontend secret leaks
-          - exposed JSON responses
-          - accidental information disclosure
-
-      Example:
-          --wtf 3
-
-  {C}--sub, --subdomains{G}
-      Enumerate subdomains
-
-      Sources:
-          - DNSDumpster
-          - VirusTotal API
-          - crt.sh
-          - custom tool wordlist
-
-      Notes:
-          - VirusTotal API key needed
-          - DNSDumpster API key needed
-          - crt.sh can be unstable
-          - Multiple retries are automatically performed
-          - If no token is provided, subdomain enumeration will rely only on crt.sh 
-            and brute-force fuzzing using the tool's built-in subdomain wordlist.
-
-  {C}--dir{G}
-      Enumeration and testing of common directories and sensitive files
-      from the target domain root.
-
-      Levels:
-        1 - Low
-        2 - Moderate
-        3 - Medium
-        4 - High
+import argparse, sys, json, re, signal, base64, io
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import redirect_stdout
+from Dependencies.displays import isargsok, clear_screen, print_banner, help_menu, no_clean, M, W, R, Y, G, C, highlight, handle_error, init_env_file, ensure_http
+from Dependencies.save_output import init_report, save_report, add_result
+from Dependencies.url_parse import extract_domain, extract_strictdomain, extract_params
+from Dependencies.JWT.jwt_parser import analyze_jwt, print_jwt_analysis, is_jwt
+from Dependencies.JWT.jwt_payload import JWTPlayground
+from Dependencies.CrawlURLS.wayback import wayback_urls
+from Dependencies.CrawlURLS.crawl import crawl_extractit
+from Dependencies.CrawlURLS.wtf_scan import wtf_scan, is_personal_email, is_sensitive_url
+from Dependencies.Versions_detection.headers import extract_headers
+from Dependencies.Versions_detection.source import extract_assets_tech
+from Dependencies.Versions_detection.wordpress_vuln_displayer import extract_wordpress
+from Dependencies.Versions_detection.CVE_vuln_displayer import is_there_a_vuln, scan_all_versions
+from Dependencies.Subdomains.subdomains import get_subdomains, is_reverse_proxy
+from Dependencies.Traversal.traversal import detect_os_from_headers, crawl_extract, test_traversal
+from Dependencies.Open_redirect.openredirect import run_openredirect
+from Dependencies.get_request import ensure_tor_or_exit, resolve_ip
+from Dependencies.Audit.basic_checks import auditor
+from Dependencies.Audit.ssl_checks import ssl_that
+from Dependencies.crlf.crlf_headers import crlf_test
+from Dependencies.waf_detection.waf_detect import whatwaf
+from Dependencies.favicon_hash.favicon_osint import whatfavicon
+from Dependencies.github_commits.commits import repos
+from Dependencies.TLD.tld_enum import tld_main
+from Dependencies.dir_enum.dir_files_scan import do_fuzz_paths
+from Dependencies.do403_bypass.fuzzer_403 import do_403
+from Dependencies.auth_401.basic_auth import fuzz_auth
+from Dependencies.Wordpress_auth.automated_wordpress_bruteforce import wordpress_fuzz
+
+
+def handle_exit(sig, frame):
+    print(f"\n{R}[!] Ctrl+C detected, closing...")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_exit)
+
+
+def process_target(args, target_url):
+    local_args = argparse.Namespace(**vars(args))
+    local_args.url = target_url
+    
+    if local_args.file:
+        print(f"\n{Y}{'='*60}")
+        print(f"{G}[TARGET] {W}{local_args.url}")
+        print(f"{Y}{'='*60}\n")
+
+
+    # -------------------------
+    # JWT Tokens
+    # -------------------------
+    if args.jwt:
+        if not is_jwt(args.jwt):
+            handle_error("Invalid JWT format", "ERROR")
+            return
+        analyze_jwt(args.jwt)
+        pg = JWTPlayground(args.jwt)
         
-        Higher levels increase the number of paths tested.
-
-      Default: 1
-
-  {C}--bypass-403{G}
-      Tests common 403/401 access control bypass techniques against the supplied URL.
-
-      Includes:
-        - Path normalization bypasses
-        - Encoded path variations
-        - Suffix and extension tricks
-        - Header-based bypasses
-        - Host and IP spoofing headers
-        - Reverse proxy misconfigurations
-
-      Results are classified by severity:
-        LOW     - Response differs from baseline
-        MEDIUM  - Redirects or authentication changes
-        HIGH    - Successful access (200/2xx)
-
-      Example:
-        --url https://target.com/admin --bypass-403
-
-  {C}--tld{G}
-      Enumerate a domain's DNS extensions to identify a related parent domain or detect the presence of clones
-
-  {C}--favicon{G}
-      Retrieves the target favicon and computes its MurmurHash3 (Shodan-compatible).
-
-      Displays:
-        - Favicon hash
-        - Shodan search filter
-        - Direct Shodan search URL
-        - Censys search URL
-
-      Useful for:
-        - Identifying related assets
-        - Finding servers sharing the same favicon
-        - Infrastructure reconnaissance
-
-      Example:
-        --url https://target.com --favicon
-
-
-{Y}VULNERABILITY ANALYSIS
-───────────────────────────────────────────────────────────────────────{G}
-  {C}--vln, --vuln{G}
-      Detect vulnerable technologies and associated CVEs
-
-      Detection sources:
-          - Wappalyzer
-          - WebTech
-          - custom regex fingerprints
-
-      CVE / exploit mapping:
-          - Search-Vulns
-          - CPE generation
-          - exploit correlation
-
-  {C}--exp, --exploit-search <query>{G}
-      Manual exploit and vulnerability search
-
-      Supported formats:
-
-      Technology + Version:
-          --exploit-search "PHP 8.1"
-
-      CVE:
-          --exploit-search CVE-2024-3566
-
-      CPE:
-          --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*
-
-  {C}--audit{G}
-      Perform basic security audit
-
-      Checks include:
-          - missing security headers
-          - weak TLS configuration
-          - dangerous HTTP methods
-          - insecure configurations
-          - common hardening issues
-
-
-{Y}WEB VULNERABILITY TESTING
-───────────────────────────────────────────────────────────────────────{G}
-  {C}--trav, --traversal{G}
-      Try detecting path traversal vulnerabilities
-
-      Supported targets:
-          - user supplied endpoints
-          - auto-discovered endpoints (crawl depth=2)
-
-      Detection features:
-          - Linux payloads
-          - Windows payloads
-          - URL encoded traversals
-          - double encoded traversals
-          - NULL byte payloads
-          - path normalization bypasses
-          - context-based payload generation
-          - web root traversal payloads
-
-      Automatic checks:
-          - OS fingerprinting from HTTP headers
-          - static resource filtering
-          - parameter discovery
-          - suspicious endpoint detection
-          - extension extraction for NULL byte attacks
-
-      Common targeted parameters:
-          - file
-          - path
-          - filename
-          - image
-          - template
-          - page
-          - folder
-          - manifest
-          - download
-
-      Vulnerability indicators:
-          - /etc/passwd disclosure
-          - win.ini disclosure
-          - Linux account signatures
-          - Windows configuration leaks
-
-      Supported payload families:
-          - classic traversal
-          - encoded traversal
-          - double encoded traversal
-          - double encoded traversal
-          - mixed slash traversal
-          - UTF-8 bypass payloads
-          - NULL byte injections
-
-      Post-exploitation helpers:
-          - existing file enumeration
-          - root path discovery
-          - web directory traversal testing
-          - HTTP 200 response collection
-
-      Notes:
-          - Static assets are ignored automatically
-          - Crawling is limited to allowed domains
-          - Non-HTML responses are skipped during crawl
-          - Traversal payloads adapt to detected OS
-          - Duplicate endpoints are automatically filtered
-
-      Example:
-          https://target.com/?file=test
-
-      Example usage:
-          python3 thiefhunter.py -u "https://target.com/?file=test" --trav
-          python3 thiefhunter.py -u "https://target.com/" --trav
-
-  {C}--ord, --open-redirect{G}
-      Try open redirect vulnerabilities
-
-      Works on:
-          - supplied endpoint
-          - auto-crawled endpoints (depth=2)
-
-      Example:
-          https://target.com/?redirect=test
-
-  {C}--crlf{G}
-      Try detecting CRLF injections
-
-      Notes:
-          - Header-based testing
-          - Detection-oriented
-          - Not intended for operational exploitation
-
-  {C}--waf{G}
-      Detect Web Application Firewall protections
-
-      Features:
-          - fingerprinting
-          - detection scoring
-          - heuristic analysis
-
-      Recommendation:
-          Use with --verbose for detailed scoring
-          and manual verification assistance
-
-  {C}--commit{G}
-      Detect personnal and professionnals emails from public GitHub repos from the target username
-
-      Purpose:
-          Find personal data directly associated with the developers. An email address can be used 
-          to correlate passwords leaked by the user, or from those leaks, identify a pattern in how 
-          the person or the target’s technical teams create passwords
-
-
-{Y}BASIC AUTH FUZZING
-───────────────────────────────────────────────────────────────────────{G}
- {C}--basic-auth{G}
-      Fuzz HTTP Basic Authentication credentials
-
-      Features:
-          - username/password wordlist support
-          - single credential testing
-          - HTTP Basic Auth header generation
-          - authentication response analysis
-          - valid credential detection
-          - WAF/firewall block detection
-          - request and response debugging
-          - fuzzing statistics and progress tracking
-
-      Usage:
-          Supports direct values or files:
-              --user admin
-              --password password
-
-          or wordlists:
-              --user @users.txt
-              --password @passwords.txt
-
-      Detection:
-          Identifies authentication differences based on:
-              - HTTP status codes
-              - server responses
-              - access behavior changes
-
-      Recommendation:
-          Use with --verbose for detailed request attempts and response analysis
-
-
-{Y}WORDPRESS FUZZING
-───────────────────────────────────────────────────────────────────────{G}
- {C}--wordpress{G}
-      Enumerate WordPress users and test authentication methods
-
-      Features:
-          - WordPress user enumeration
-          - REST API user discovery
-          - author ID enumeration (?author=)
-          - author sitemap enumeration
-          - oEmbed user detection
-          - WordPress version detection
-          - XML-RPC detection
-          - system.multicall vulnerability detection (< WordPress 4.4)
-          - wp-login.php authentication
-          - XML-RPC authentication
-          - adaptive rate limiting
-          - WAF/firewall detection
-          - progress tracking
-          - single credentials or wordlists
-          - automatic authentication method selection
-
-      Usage:
-          Enumeration only:
-              --wordpress / -wp
-
-          Test a single account:
-              --wordpress --user admin --password password123
-
-          Use wordlists both usernames and passwords:
-              --wordpress --user @file/to/users.txt --password @file/to/passwords.txt
-
-          Use wordlists with one username:
-              --wordpress --user admin --password @file/to/passwords.txt
-
-      Detection:
-          Enumerates users using:
-              - REST API endpoints
-              - oEmbed endpoint
-              - author archives
-              - author sitemaps
-
-          Detects authentication surface:
-              - wp-login.php
-              - xmlrpc.php
-              - system.multicall availability
-
-      Recommendation:
-          Use with --verbose to display every endpoint, request,
-          detected authentication method and WordPress version.
-
-
-{Y}AUTOMATION
-───────────────────────────────────────────────────────────────────────{G}
-  {C}--batch{G}
-      Automation of default user inputs. Script execution without any user interaction, for example 
-      by automatically handling prompts related to --traversal or --subdomains during successful 
-      tests that would normally ask whether the user wants to proceed further with the testing
-
-
-{Y}EXAMPLES
-───────────────────────────────────────────────────────────────────────{G}
-  Basic security audit:
-      {Y}python3 thiefhunter.py -u https://target.com --audit{G}
-
-  Crawl and extract URLs:
-      {Y}python3 thiefhunter.py -u https://target.com -e 2{G}
-
-  Extract Wayback URLs:
-      {Y}python3 thiefhunter.py -u https://target.com --wayback{G}
-
-  Wayback with exclusions:
-      {Y}python3 thiefhunter.py -u https://target.com --wayback --exclude jpg,png,css{G}
-
-  Deep secret scan:
-      {Y}python3 thiefhunter.py -u https://target.com --wtf 3{G}
-
-  JWT analysis:
-      {Y}python3 thiefhunter.py --jwt TOKEN{G}
-
-  Exploit search:
-      {Y}python3 thiefhunter.py --exploit-search "Apache 2.4.49"{G}
-
-  Through Burp Suite:
-      {Y}python3 thiefhunter.py -u https://target.com --proxy http://127.0.0.1:8080 --vln{G}
-
-  Through Tor:
-      {Y}python3 thiefhunter.py -u https://target.com --tor --traversal{G}
-
-  Path traversal testing:
-      {Y}python3 thiefhunter.py -u "https://target.com/?file=test" --trav{G}
-
-  Open redirect testing:
-      {Y}python3 thiefhunter.py -u "https://target.com/?redirect=test" --ord{G}
-
-  Basic Auth fuzzing:
-      {Y}python3 thiefhunter.py -u "https://target.com/login" --basicauth -U admin -P "@\path\to\your passwords.txt" --batch -v{G}
-
-{Y}═══════════════════════════════════════════════════════════════════════{G}
-'''
-
-
-def clear_screen():
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-def print_banner():
-    print(banner)
-
-def highlight(text, color=R):
-    return f"{color}{text}{W}"
-
-def isargsok(args, what):
-    if what == "need_url":
-        if not args.url and not args.file:
-            print(f"{R}[Error] args --url or --file missing")
-            print(f"{W}   --> Skipping...\n")
-            return False
-
-    if what == "need_commit":
-        if not args.commits:
-            print(f"{R}[Error] args --commit missing")
-            print(f"{W}   --> Skipping...\n")
-            return False
-
-    if what == "need_wayback_or_extract":
-        if not (args.wayback or args.extract):
-            print(f"{R}[Error] args --wayback missing")
-            print(f"{W}   --> Skipping...\n")
-            return False
-            
-    if what == "need_fuzzer":
-        if not (args.url and args.user and args.password):
-            print(f"{R}[Error] args --url --user --password missing")
-            print(f"{W}   --> Skipping...\n")
-            return False
-            
-    if what == "need_fuzzer_wp":
-        if not args.url:
-            print(f"{R}[Error] args --url missing")
-            print(f"{W}   --> Skipping...\n")
-            return False
-            
-        if args.user:    
-            if not args.password:
-                print(f"{R}[Error] args --password missing")
-                print(f"{W}   --> Skipping...\n")
-                return False
+        try:
+            pg = JWTPlayground(args.jwt)
+        except ValueError as e:
+            handle_error(e, "ERROR", args.verbose)
+            return
+        
+        tests = pg.generate()
+        for t in tests:
+            print(f"{G}[*] {t.name}{W}")
+            print(
+                f"{Y}[signature] "
+                f"{t.signature_status}{W}"
+            )
+
+            print(t.token)
+            print()
+
+    # -------------------------
+    # GITHUB COMMITS
+    # -------------------------
+    if local_args.commits:
+        isargsok(local_args, "need_commit")
+        repos(args, local_args.commits)
+
+
+    # -------------------------
+    # Wayback URLs
+    # -------------------------
+    if local_args.exclude:
+        isargsok(local_args, "need_wayback_or_extract")
+
+    if local_args.show_all:
+        isargsok(local_args, "need_wayback_or_extract")
+
+    if local_args.wayback:
+        if isargsok(local_args, "need_url"):
+            extracted_domain = extract_domain(local_args.url)
+            exclude_ext = None
+            if local_args.exclude:
+                exclude_ext = [
+                    f".{ext.strip().lower().lstrip('.')}"
+                    for ext in local_args.exclude.split(",")
+                ]
+
+            wayback_output, total, filtered = wayback_urls(extracted_domain, exclude_ext=exclude_ext, show_all=local_args.show_all)
+            for i, url in enumerate(wayback_output, 1):
+                print(f"{G}[{i:04}] {W}{url}")
+                if args.save:
+                    add_result("Wayback_machine", {
+                        "url": f"{url}"
+                    })
+
+            print(f"\n{G}[+] Found {len(wayback_output)} URLs")
+            print(f"{G}[*] {filtered} URLs filtered (assets / no params / excluded)")
+
+
+    # -------------------------
+    # Crawl URLs with parameters
+    # -------------------------
+    if local_args.extract:
+        if isargsok(local_args, "need_url"):
+            exclude_ext = None
+            if local_args.exclude:
+                exclude_ext = [
+                    f".{ext.strip().lower().lstrip('.')}"
+                    for ext in local_args.exclude.split(",")
+                ]
                 
-    return True
-
-def no_clean(args):
-    if not args.no_clean:
-        clear_screen()
-    print_banner()
+            print(f"{C}[!] {G}Crawling with depth {local_args.extract}")
+            crawl_extractit(local_args, local_args.url, max_depth=local_args.extract, exclude_ext=exclude_ext, show_all=local_args.show_all)
 
 
-def handle_error(e, context=None, verbose=False):
-    error_type = type(e).__name__
-    error_message = str(e)
-    prefix = f"{R}[ERROR] {context} -> " if context else f"{R}[ERROR] "
-    if verbose and isinstance(e, BaseException):
-        tb = traceback.extract_tb(e.__traceback__)[-1]
-        filename = tb.filename
-        line = tb.lineno
-        print(
-            f"{prefix}{error_type}: {error_message} "
-            f"(file={filename}, line={line}){W}"
-        )
-    else:
-        print(f"{prefix}{error_type}: {W}{error_message}{W}")
-
-
-def ensure_http(url: str) -> str:
-    if not url.startswith(("http://", "https://")):
-        return "https://" + url
-    return url
-
-
-def init_env_file(args):
-    env_content = """\
-DNSDUMPSTER_API_KEY=
-VIRUSTOTAL_API_KEY=
-WORDFENCE_API_KEY=
-SEARCH_VULNS_API_KEY=
-GITHUB_API_KEY=
-"""
-    if args.verbose:
-        print(f"{Y}[!] {W}Checking .env file status...")
-        
-    env_file = Path(".env")
-    if not env_file.exists():
-        if args.verbose:
-            print(f"{Y}[*] {W}Creating .env file. Add your API KEYS")
+    # -------------------------
+    # Search for URLs, API, emails, phones, conf files
+    # -------------------------
+    if local_args.wtf:
+        if isargsok(local_args, "need_url"):
+            def fmt(item):
+                """
+                Normalizes scan outputs for printing.
+                Works with:
+                - dicts: {"value", "page", "line"}
+                - strings
+                """
+                if isinstance(item, dict):
+                    value = item.get("value", "")
+                    page = item.get("page")
+                    line = item.get("line")
+                    if page is not None and line is not None:
+                        return f"{value} ({page}:{line})"
+                    return str(value)
+                return str(item)
             
-        env_file.write_text(env_content, encoding="utf-8")
-    print()    
+            print(f"{C}[!] {G}Running WTF scan (depth={local_args.wtf})")
+            data = wtf_scan(local_args.url, local_args, max_depth=local_args.wtf)
+            print()
+            
+            if data["emails"]:
+                print(f"{G}[+] Emails")
+                extracted_domain = extract_strictdomain(local_args.url)
+                for e in data["emails"]:
+                    email = e["value"]
+                    page = e["page"]
+                    line = e["line"]
+
+                    if is_personal_email(email, extracted_domain):
+                        print(f"{G}    - {highlight(email, R)} {Y}({page}:{line})")
+                    else:
+                        print(f"{G}    - {W}{email} {Y}({page}:{line})")
+                        
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "emails",
+                            "data": {
+                                "email_found": email,
+                                "page": page,
+                                "line": line
+                            }
+                        })
+                print()
+
+            if data["phones"]:
+                print(f"{G}[+] Phones (FR - 06 / 07)")
+                for p in data["phones"]:
+                    print(f"{G}    - {W}{p['value']} {Y}({p['page']}:{p['line']})")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "phones",
+                            "data": {
+                                "phone_found": p["value"],
+                                "page": p["page"],
+                                "line": p["line"]
+                            }
+                        })
+                print()
+
+            if data["secrets"]:
+                print(f"{G}[+] Secrets")
+                for s in data["secrets"]:
+                    print(f"{G}    - {W}{s['value']} {Y}({s['page']}:{s['line']})")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "secrets",
+                            "data": {
+                                "secret_found": s["value"],
+                                "page": s["page"],
+                                "line": s["line"]
+                            }
+                        })
+                print()
+
+            if data["robots"]:
+                print(f"{G}[+] robots.txt - Disallowed")
+                for r in data["robots"]:
+                    if is_sensitive_url(r):
+                        print(f"{G}    - {highlight(r, R)}")
+                    else:
+                        print(f"{G}    - {W}{r}")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "robots",
+                            "data": {
+                                "robots_found": r
+                            }
+                        })
+                print()
+
+            if data["subdomains"]:
+                print(f"{G}[+] Detected subdomains")
+                for r in data["subdomains"]:
+                    print(f"{G}    - {W}{r}")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "subdomains",
+                            "data": {
+                                "subdomain_found": r
+                            }
+                        })
+                print()
+
+            if data["apis"]:
+                print(f"{G}[+] APIs")
+                for r in data["apis"]:
+                    if is_sensitive_url(r):
+                        print(f"{G}    - {highlight({r['value']}, R)} {Y}({r['page']}:{r['line']})")
+                    else:
+                        print(f"{G}    - {W}{r['value']} {Y}({r['page']}:{r['line']})")
+                    
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "apis",
+                            "data": {
+                                "api_found": {r['value']},
+                                "page": r["page"],
+                                "line": r["line"]
+                            }
+                        })
+                print()
+                
+            if data["sensitive_keywords"]:
+                print(f"{G}[+] Sensitive keywords")
+
+                for r in data["sensitive_keywords"]:
+                    print(f"{G}    - {W}{r['value']} {Y}({r['page']}:{r['line']})")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "sensitive_keyword",
+                            "data": {
+                                "keyword_found": r["value"],
+                                "page": r["page"],
+                                "line": r["line"]
+                            }
+                        })
+
+                print()
+
+            if data["sensitive_urls"]:
+                print(f"{G}[+] Sensitive urls")
+
+                for p in data["sensitive_urls"]:
+                    url = p["value"]
+
+                    if is_sensitive_url(url):
+                        print(f"{G}    - {highlight(url, R)} {Y}({p['page']}:{p['line']})")
+                    else:
+                        print(f"{G}    - {W}{url} {Y}({p['page']}:{p['line']})")
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "sensitive_urls",
+                            "data": {
+                                "url_found": url,
+                                "page": p["page"],
+                                "line": p["line"]
+                            }
+                        })
+
+                print()
+
+            if data.get("base64"):
+                print(f"{G}[+] BASE64 decoded content")
+                for b in data["base64"]:
+                    print(
+                        f"{G}    - {W}{b['value']} {Y}({b['page']}:{b['line']})"
+                    )
+
+                    if args.save:
+                        add_result("Secrets_WTF_scan", {
+                            "type": "base64_text",
+                            "data": {
+                                "b64_found": b["value"],
+                                "page": b["page"],
+                                "line": b["line"]
+                            }
+                        })
+                print()
+
+            if not any(data.values()):
+                print(f"{R}[-] Nothing found")
+                if args.save:
+                    add_result("Secrets_WTF_scan", {
+                        "results": "nothing found"
+                    })
+
+
+    # -------------------------
+    # Search for versions and associated CVE and exploits
+    # -------------------------
+    if local_args.vuln:
+        if isargsok(local_args, "need_url"):
+            seen_headers = set()
+            seen_all = set()
+            versions_list = []
+            def normalize(name):
+                return re.sub(r"[^a-z0-9]", "", name.lower())
+
+            def is_valid_version(version): # allow: 1.2 - 1.2.3 - 4.9.7.2
+                return bool(re.fullmatch(r"\d+(?:\.\d+){1,4}", version))
+
+            print(f"\n{C}[+] Versions and vulnerabilities detection")
+            techs = extract_headers(local_args, local_args.url)
+            if techs:
+                print(f"{G}[+] Headers detection")
+                for t in techs:
+                    tech_name = t["tech"]
+                    version = t["version"]
+                    full = f"{tech_name} {version}" if version else tech_name
+                    key = normalize(full)
+                    if key not in seen_all:
+                        seen_all.add(key)
+                        seen_headers.add(key)
+                        print(f"    {G}- {highlight(full, Y)}")
+                        
+                        if args.save:
+                            add_result("Version_and_vuln_detection", {
+                                "Type": "headers",
+                                    "data": {
+                                        "Name": tech_name,
+                                        "Version": version
+                                    }
+                            })
+
+                    if version and is_valid_version(version):
+                        versions_list.append({
+                            "name": tech_name,
+                            "version": version
+                        })
+                print()
+                
+            tech = extract_assets_tech(local_args, local_args.url)
+            if tech:
+                print(f"{G}[+] Assets detection")
+                for name, version in tech:
+                    full = f"{name} {version}".strip() if version else name
+                    key = normalize(full)
+                    if key in seen_headers:
+                        continue
+
+                    if key not in seen_all:
+                        seen_all.add(key)
+                        print(f"    {G}- {highlight(full, Y)}")
+                        
+                        if args.save:
+                            add_result("Version_and_vuln_detection", {
+                                "Type": "Assets",
+                                    "data": {
+                                        "Name": name,
+                                        "Version": version
+                                    }
+                            })
+                        
+                        versions_list.append({
+                            "name": name,
+                            "version": version
+                        })
+        filtered = [
+            item for item in versions_list
+            if item.get("version") and item["version"].strip()
+        ]
+        extract_wordpress(filtered, local_args)
+        versions_dict = {
+            local_args.url: {
+                item["name"]: {"version": item["version"]}
+                for item in filtered
+            }
+        }
+        is_there_a_vuln(versions_dict, local_args)
+
+
+    # -------------------------
+    # Search specific vuln
+    # -------------------------
+    if local_args.exploit_search:
+        print(f"\n{C}[+] Search-vulns scan")
+        scan_all_versions(local_args.exploit_search, local_args)
+
+    # -------------------------
+    # Audit (basic checks)
+    # -------------------------
+    if local_args.audit:
+        if isargsok(local_args, "need_url"):
+            auditor(local_args)
+            extracted_domain = extract_strictdomain(local_args.url)
+            ssl_that(extracted_domain, local_args)
+            ip = resolve_ip(local_args, extracted_domain)
+            if ip:
+                ip_b64 = base64.b64encode(ip.encode("utf-8"))
+                print(f"{Y}\n[!] {G}Interesting urls to visit")
+                print(f" {G}- {W}https://www.shodan.io/host/{ip}")
+                print(f' {G}- {W}https://platform.censys.io/search?q=host.ip%3D"{ip}"')
+                print(f" {G}- {W}https://en.fofa.info/result?qbase64={ip_b64}%3D")
+                print(f" {G}- {W}https://www.virustotal.com/gui/ip-address/{ip}/details")
+
+
+    # -------------------------
+    # Subdomains
+    # -------------------------
+    if local_args.subdomains:
+        if isargsok(local_args, "need_url"):
+            extracted_domain = extract_strictdomain(local_args.url)
+            get_subdomains(local_args, extracted_domain)
+
+
+    # -------------------------
+    # Directory and files enum
+    # -------------------------
+    if local_args.dir:
+        if isargsok(local_args, "need_url"):
+            do_fuzz_paths(local_args)
+
+
+    # -------------------------
+    # 403 bypass
+    # -------------------------
+    if local_args.bypass_403:
+        if isargsok(local_args, "need_url"):
+            do_403(local_args)
+
+    # -------------------------
+    # Path traversal
+    # -------------------------
+    if local_args.traversal:
+        if isargsok(local_args, "need_url"):
+            OS_type = detect_os_from_headers(local_args, local_args.url)
+            parsed = extract_params(local_args.url)
+            if parsed["params"]:
+                print(f"{Y}[!] {W}Endpoint detected: {parsed['params']}")
+                for param in parsed["params"]:
+                    print(f"{Y}[*] {W}Testing param: {param}")
+                    test_traversal(local_args, parsed["base"], param, OS_type)
+            else:
+                print(f"{R}[-] {W}No endpoint found in URL, starting crawl...")
+                endpoints = crawl_extract(local_args, local_args.url, max_depth=2)
+                if not endpoints:
+                    print(f"{R}[-] {W}No endpoints discovered during crawl")
+                for ep_base, data in endpoints.items():
+                    params = data["params"]
+                    print(f"{G}[+] {W}Endpoint: {ep_base} -> params: {params}")
+                    examples = data.get("examples", {})
+                    for param in params:
+                        example_url = examples.get(param, ep_base)
+                        print(f"{G}[*] {W}Testing crawled param: {param} -> {example_url}")
+                        test_traversal(local_args, example_url, param, OS_type)
+
+
+    # -------------------------
+    # Open redirect
+    # -------------------------
+    if local_args.open_redirect:
+        if isargsok(local_args, "need_url"):
+            run_openredirect(local_args)
+
+
+    # -------------------------
+    # CRLF
+    # -------------------------
+    if local_args.crlf:
+        if isargsok(local_args, "need_url"):
+            crlf_test(local_args)
+
+
+    # -------------------------
+    # WAF
+    # -------------------------
+    if local_args.waf:
+        if isargsok(local_args, "need_url"):
+            whatwaf(local_args)
+
+
+    # -------------------------
+    # FAVICON
+    # -------------------------
+    if local_args.favicon:
+        if isargsok(local_args, "need_url"):
+            whatfavicon(local_args)
+
+
+    # -------------------------
+    # TLD enum
+    # -------------------------
+    if local_args.tld:
+        if isargsok(local_args, "need_url"):
+            tld_main(local_args)
+
+
+    # -------------------------
+    # BASIC AUTH FUZZER (401)
+    # -------------------------
+    if local_args.basicauth:
+        print(f"\n{Y}[!] Basic auth on {C}{args.url}")
+        if isargsok(local_args, "need_fuzzer"):
+            fuzz_auth(args)
+
+
+    # -------------------------
+    # WORDPRESS FUZZER (login)
+    # -------------------------
+    if local_args.wordpress:
+        print(f"\n{Y}[!] Wordpress auth fuzzer on {args.url}")
+        if isargsok(local_args, "need_fuzzer_wp"):
+            wordpress_fuzz(args)
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Automated Bug Hunting and Pentesting Tool")
+    parser.add_argument("-hh", action="store_true", help="Show full help menu")
+    parser.add_argument("-nc", "--no-clean", action="store_true", help="Do not clean the CLI")
+    parser.add_argument("--jwt", help="Check JWT Bearer Token (--jwt JWT_TOKEN)")
+    parser.add_argument("-u", "--url", help="Target URL to scan")
+    parser.add_argument("-f", "--file", help="Targets URL to scan from file")
+    parser.add_argument("--random-headers", action="store_true", help="Use random User-Agent for each requests from the header file (paylaods) instead of default one")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable Verbose mode")
+    parser.add_argument("-p", "--proxy", help="Custom proxy (--proxy http://user:pass@host:port)")
+    parser.add_argument("--tor", action="store_true", help="Force use of Tor SOCKSH proxy (127.0.0.1:9050)")
+    parser.add_argument("-t", "--timeout", type=int, default=15, help="Request timeout in seconds (default: 15)")
+    parser.add_argument("--headers", help='Custom headers as JSON string (--headers "Accept=application/json,Authorization=Bearer TOKEN")')
+    parser.add_argument("-c", "--cookies", help='Cookies as JSON string (--cookies "session=abc123; token=xyz789")')
+    parser.add_argument("-X", "--method", default="GET", choices=["GET", "POST", "PUT", "DELETE"], help="HTTP method (default: GET)")
+    parser.add_argument("-e", "--extract", type=int, help="Crawl and extract URLs with parameters (--extract 2)")
+    parser.add_argument("-w", "--wayback", action="store_true", help="Extract Wayback Machine URLs")
+    parser.add_argument("--exclude", help="Exclude extensions from --wayback (comma separated, e.g: png,jpg,css,js)")
+    parser.add_argument("--show-all", action="store_true", help="Show all URLs from --wayback (default = only URLs with parameters)")
+    parser.add_argument("--wtf", type=int, help="Deep scan: extract emails, phones, secrets + robots.txt (--wtf 3)")
+    parser.add_argument("--vln", "--vuln", dest="vuln", action="store_true", help="Detect vulnerable versions and associated CVE and exploits")
+    parser.add_argument("--dir", type=int, choices=[1, 2, 3, 4], default=None, help="Directory fuzzing level (1=Low 2=Moderate 3=Medium 4=High)")
+    parser.add_argument("--exp", "--exploit-search", dest="exploit_search", help='Search exploit from technologie and version (--exploit-search "PHP 8.1" or --exploit-search CVE-2026-8838 or --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*)')
+    parser.add_argument("--audit", action="store_true", help="Perform basic checks on missing headers and configurations")
+    parser.add_argument("--sub", "--subdomains", dest="subdomains", action="store_true", help="Detect target subdomains (DNSDumpster, VirusTotal API key needed)")
+    parser.add_argument("--tld", action="store_true", help="Detect new dns extension target (target.to becoming target.cz for exemple")
+    parser.add_argument("--trav", "--traversal", dest="traversal", action="store_true", help="Try path traversal on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
+    parser.add_argument("--ord", "--open-redirect", dest="open_redirect", action="store_true", help="Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
+    parser.add_argument("--crlf", action="store_true", help="Try to detect crlf injections")
+    parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
+    parser.add_argument("--favicon", action="store_true", help="Try to detect favicon hash")
+    parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
+    parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires both -U/--user and -P/--password")
+    parser.add_argument("-wp", "--wordpress", action="store_true", help="Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.")
+    parser.add_argument("-U", "--user", help="username or @usernames_filepath")
+    parser.add_argument("-P", "--password", help="password or @passwords_filepath")
+    parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
+    parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
+    parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>)")
+    
+    args = parser.parse_args()
+    
+    
+    # -------------------------
+    # Forms & params
+    # -------------------------
+    if len(sys.argv) == 1:
+        clear_screen()
+        print_banner()
+        parser.print_usage()
+        sys.exit()
+
+    no_clean(args)
+    print(f"{Y}[!] {C}Command: {G}{' '.join(sys.argv)}")
+
+    init_env_file(args)
+
+    # -------------------------
+    # Full help menu
+    # -------------------------
+    if args.hh:
+        print(help_menu)
+        exit(0)
+
+    # -------------------------
+    # Tor check
+    # -------------------------
+    if args.tor:
+       ensure_tor_or_exit()
+
+    if args.file:
+        try:
+            with open(args.file, "r", encoding="utf-8") as f:
+                targets = [
+                    ensure_http(line)
+                    for line in f
+                    if line.strip()
+                ]
+        except Exception as e:
+            print(f"{R}[-] Cannot read file: {e}")
+            sys.exit(1)
+
+
+        # -------------------------
+        # Save Output (init)
+        # -------------------------
+        if args.save:
+            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                init_report(args)
+
+        # -------------------------
+        # Sequential mode
+        # -------------------------
+        for target in targets:
+            if not target.startswith(("http://", "https://")):
+                print(f"{R}[-] Invalid URL: {target}") # no need now but still there
+                continue
+
+            try:
+                process_target(args, target)
+            except KeyboardInterrupt:
+                raise
+                
+            except Exception as e:
+                print(f"{R}[-] Error with {target}: {e}")
+
+        # -------------------------
+        # Save Output (end)
+        # -------------------------
+        if args.save:
+            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                print(f"\n{Y}[!] {W}Generating the JSON repor...")
+                filename = save_report(args)
+                print(f"{G}[+] {W}Report saved to {filename}")
+
+        print(f"\n{Y}[!] {W}End of multi-target scan")
+
+    else:
+
+        # -------------------------
+        # Save Output (init)
+        # -------------------------
+        if args.save:
+            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                init_report(args)
+
+        # -------------------------
+        # Single mode
+        # -------------------------
+        process_target(args, ensure_http(args.url))
+
+        # -------------------------
+        # Save Output (end)
+        # -------------------------
+        if args.save:
+            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                print(f"\n{Y}[!] {W}Generating the JSON repor...")
+                filename = save_report(args)
+                print(f"{G}[+] {W}Report saved to {filename}")
+
+        print(f"\n{Y}[!] {W}End of search")
+
+
+if __name__ == "__main__":
+    main()
