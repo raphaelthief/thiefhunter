@@ -557,7 +557,7 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable Verbose mode")
     parser.add_argument("-p", "--proxy", help="Custom proxy (--proxy http://user:pass@host:port)")
     parser.add_argument("--tor", action="store_true", help="Force use of Tor SOCKSH proxy (127.0.0.1:9050)")
-    parser.add_argument("-t", "--timeout", type=int, default=15, help="Request timeout in seconds (default: 15)")
+    parser.add_argument("-t", "--timeout", type=int, default=60, help="Request timeout in seconds (default: 60)")
     parser.add_argument("--headers", help='Custom headers as JSON string (--headers "Accept=application/json,Authorization=Bearer TOKEN")')
     parser.add_argument("-c", "--cookies", help='Cookies as JSON string (--cookies "session=abc123; token=xyz789")')
     parser.add_argument("-X", "--method", default="GET", choices=["GET", "POST", "PUT", "DELETE"], help="HTTP method (default: GET)")
