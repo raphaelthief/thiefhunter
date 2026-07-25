@@ -1,0 +1,103 @@
+# Common TCP ports (Top 100)
+# Format: port
+
+7       # Echo
+9       # Discard
+13      # Daytime
+17      # QOTD
+19      # Chargen
+20      # FTP data
+21      # FTP control
+22      # SSH
+23      # Telnet
+25      # SMTP
+37      # Time
+42      # WINS
+43      # WHOIS
+49      # TACACS
+53      # DNS
+67      # DHCP Server
+68      # DHCP Client
+69      # TFTP
+70      # Gopher
+79      # Finger
+80      # HTTP
+81      # HTTP alternate
+88      # Kerberos
+110     # POP3
+111     # RPCBind
+113     # Ident
+119     # NNTP
+123     # NTP
+135     # MS RPC
+137     # NetBIOS Name
+138     # NetBIOS Datagram
+139     # NetBIOS Session
+143     # IMAP
+161     # SNMP
+162     # SNMP Trap
+179     # BGP
+194     # IRC
+389     # LDAP
+443     # HTTPS
+445     # SMB
+465     # SMTPS
+500     # ISAKMP
+514     # Syslog
+515     # LPD Printer
+520     # RIP
+554     # RTSP
+587     # SMTP Submission
+631     # IPP Printer
+636     # LDAPS
+873     # Rsync
+902     # VMware
+989     # FTPS data
+990     # FTPS control
+993     # IMAPS
+995     # POP3S
+1080    # SOCKS Proxy
+1194    # OpenVPN
+1433    # MSSQL
+1521    # Oracle DB
+1723    # PPTP
+2049    # NFS
+2082    # cPanel
+2083    # cPanel SSL
+2181    # ZooKeeper
+2222    # SSH alternate
+2375    # Docker API
+3000    # NodeJS / Dev server
+3306    # MySQL
+3389    # RDP
+3690    # SVN
+4369    # Erlang
+5000    # Flask / UPnP
+5432    # PostgreSQL
+5672    # RabbitMQ
+5900    # VNC
+5985    # WinRM HTTP
+5986    # WinRM HTTPS
+6000    # X11 Window System
+6379    # Redis
+6443    # Kubernetes API
+6666    # IRC alternate
+6667    # IRC
+7001    # WebLogic
+8000    # HTTP alternate
+8008    # HTTP alternate
+8080    # HTTP Proxy / Tomcat
+8081    # HTTP alternate
+8443    # HTTPS alternate
+8888    # Jupyter / HTTP
+9000    # PHP-FPM / SonarQube
+9090    # Prometheus
+9200    # Elasticsearch
+9300    # Elasticsearch transport
+10000   # Webmin
+11211   # Memcached
+27015   # Source Engine / Game servers
+27017   # MongoDB
+27018   # MongoDB alternate
+50000   # SAP
+50070   # Hadoop NameNode
