@@ -1,4 +1,4 @@
-import argparse, sys, json, re, signal, base64, io
+import argparse, sys, json, re, signal, base64, io, asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import redirect_stdout
 from Dependencies.displays import isargsok, clear_screen, print_banner, help_menu, no_clean, M, W, R, Y, G, C, highlight, handle_error, init_env_file, ensure_http
@@ -28,6 +28,7 @@ from Dependencies.dir_enum.dir_files_scan import do_fuzz_paths
 from Dependencies.do403_bypass.fuzzer_403 import do_403
 from Dependencies.auth_401.basic_auth import fuzz_auth
 from Dependencies.Wordpress_auth.automated_wordpress_bruteforce import wordpress_fuzz
+from Dependencies.port_scanner_TCP.tcp_scan import services_scanner
 
 
 def handle_exit(sig, frame):
@@ -545,6 +546,15 @@ def process_target(args, target_url):
             wordpress_fuzz(args)
 
 
+    # -------------------------
+    # TCP_SCANNER
+    # -------------------------
+    if local_args.tcp_scan:
+        print(f"\n{Y}[!] TCP scan on {args.url}{W}")
+        if isargsok(local_args, "need_url"):
+            extracted_domain = extract_domain(local_args.url)
+            asyncio.run(services_scanner(args, extracted_domain))
+
 
 def main():
     parser = argparse.ArgumentParser(description="Automated Bug Hunting and Pentesting Tool")
@@ -557,7 +567,7 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable Verbose mode")
     parser.add_argument("-p", "--proxy", help="Custom proxy (--proxy http://user:pass@host:port)")
     parser.add_argument("--tor", action="store_true", help="Force use of Tor SOCKSH proxy (127.0.0.1:9050)")
-    parser.add_argument("-t", "--timeout", type=int, default=60, help="Request timeout in seconds (default: 60)")
+    parser.add_argument("-t", "--timeout", type=int, default=60, help="Request timeout in seconds (default: 60 and set to 7 for --tcp-scan)")
     parser.add_argument("--headers", help='Custom headers as JSON string (--headers "Accept=application/json,Authorization=Bearer TOKEN")')
     parser.add_argument("-c", "--cookies", help='Cookies as JSON string (--cookies "session=abc123; token=xyz789")')
     parser.add_argument("-X", "--method", default="GET", choices=["GET", "POST", "PUT", "DELETE"], help="HTTP method (default: GET)")
@@ -577,6 +587,10 @@ def main():
     parser.add_argument("--crlf", action="store_true", help="Try to detect crlf injections")
     parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
     parser.add_argument("--favicon", action="store_true", help="Try to detect favicon hash")
+    parser.add_argument("--tcp-scan", action="store_true", help="TCP scanner compatible with --proxy and --tor. 100 defaults ports scanned if you don't provide --ports. Use --verbose to see filtered and closed ports")
+    parser.add_argument("--ssh-info", action="store_true", help="SSH authentications analysis")
+    parser.add_argument("--ports", help="Ports to scan (--ports 22,80,443 or --ports 1-150) or a list of ports (--ports @ports_filepath)")
+    parser.add_argument("--concurrency", default=150, type=int, help="Setup concurrency for TCP scan (default: 150)")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires both -U/--user and -P/--password")
     parser.add_argument("-wp", "--wordpress", action="store_true", help="Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.")
