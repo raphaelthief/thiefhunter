@@ -582,6 +582,101 @@ RECON / ENUMERATION
         --url https://target.com --favicon
 
 
+TCP PORT SCANNER
+───────────────────────────────────────────────────────────────────────
+ --tcp-scan
+      Asynchronous TCP port scanner with service detection and SSH analysis
+
+      Features:
+          - Fast asynchronous TCP scanning
+          - Custom port ranges and port lists
+          - Default top 100 common TCP ports scan
+          - TCP state detection:
+              - OPEN
+              - CLOSED
+              - FILTERED (timeout)
+              - FILTERED (network/proxy errors)
+          - Service identification using IANA service database
+          - Banner grabbing
+          - HTTP service detection
+          - SSH version detection
+          - SSH authentication methods enumeration
+          - SOCKS5 proxy support
+          - Tor network support
+          - Adjustable concurrency
+          - Progress tracking
+          - Adaptive output formatting
+
+      Usage:
+          Scan default ports:
+              --tcp-scan -u target.com
+
+          Scan specific ports:
+              --tcp-scan -u target.com --ports 22,80,443
+
+          Scan a port range:
+              --tcp-scan -u target.com --ports 1-1000
+
+          Use a custom port list:
+              --tcp-scan -u target.com --ports @path/to/ports.txt
+
+          Analyze SSH authentication methods:
+              --tcp-scan -u target.com --ssh-info
+
+          Scan through a SOCKS5 proxy:
+              --tcp-scan -u target.com --proxy 127.0.0.1:9050
+
+          Scan through Tor:
+              --tcp-scan -u target.com --tor
+
+      Service Detection:
+          Detects services using:
+              - IANA service names database
+              - TCP banners
+              - SSH identification strings
+              - HTTP Server headers
+
+          Identifies:
+              - SSH versions
+              - Web servers
+              - Common TCP services
+              - Service names by port
+
+      SSH Analysis:
+          With --ssh-info:
+              - Detects supported authentication methods
+              - Identifies:
+                  - password authentication
+                  - public key authentication
+
+      Performance:
+          Configure concurrency:
+              --concurrency 300
+
+          Default:
+              150 simultaneous TCP connections
+
+      Output:
+          Default output:
+              Shows only open ports
+
+          With --verbose:
+              Displays:
+                  - filtered ports
+                  - closed ports
+                  - connection errors
+
+      Recommendations:
+          Use custom port files for large scans:
+              --ports @ports.txt
+
+          When scanning through Tor:
+              --timeout 15
+              --concurrency 15
+
+          Use --ssh-info only when SSH ports are detectedto avoid unnecessary authentication checks
+
+
 VULNERABILITY ANALYSIS
 ───────────────────────────────────────────────────────────────────────
   --vln, --vuln
