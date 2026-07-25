@@ -18,3 +18,5 @@ urllib3
 packaging
 tqdm
 mmh3
+paramiko
+python-socks
