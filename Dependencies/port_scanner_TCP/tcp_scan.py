@@ -292,11 +292,12 @@ def get_scan_ports(port_arg):
 
 async def services_scanner(args, target):
     timeout = args.timeout or 7
+    tcp_concurrency = args.concurrency or 150
     proxy = setup_proxy(args)
     iana_services = load_iana_services()
-    ports = get_scan_ports(args.ports)
+    ports = get_scan_ports(args.port)
 
-    results = await worker(proxy, target, ports, timeout, args.concurrency)
+    results = await worker(proxy, target, ports, timeout, tcp_concurrency)
     
     counter = Counter()
     rows = []
