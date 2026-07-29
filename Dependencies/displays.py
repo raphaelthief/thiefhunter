@@ -385,7 +385,7 @@ GENERAL OPTIONS
 
       Performance:
           Configure concurrency:
-              --concurrency 300
+              {C}--concurrency 300
 
           Default:
               150 simultaneous TCP connections
@@ -594,6 +594,52 @@ GENERAL OPTIONS
 
       Recommendation:
           Use with --verbose for detailed request attempts and response analysis
+
+
+{Y}SSH AUTH FUZZING
+───────────────────────────────────────────────────────────────────────{G}
+ {C}--force-ssh{G}
+      Fuzz SSH authentication credentials
+
+      Features:
+          - username/password wordlist support
+          - single credential testing
+          - SOCKS4/SOCKS5 proxy support
+          - Tor SOCKS5 support (--tor)
+          - configurable concurrency (--concurrency)
+          - adaptive delay on connection errors
+          - successful credential detection
+          - authentication, SSH and network error analysis
+          - latency measurement
+          - progress tracking and statistics
+          - result export with --save
+
+      Usage:
+          Supports direct values or files:
+              --user admin
+              --password password
+
+          or wordlists:
+              --user @users.txt
+              --password @passwords.txt
+
+      Options:
+          --port 22
+          --proxy socks5://127.0.0.1:1080
+          --tor
+          --concurrency 5
+
+      Detection:
+          Identifies:
+              - valid SSH credentials
+              - authentication failures
+              - SSH protocol errors
+              - connection resets/timeouts
+              - possible rate limiting or temporary blocking
+
+      Recommendation:
+          Use with --verbose for detailed authentication attempts
+          latency measurements and SSH error analysis
 
 
 {Y}WORDPRESS FUZZING
