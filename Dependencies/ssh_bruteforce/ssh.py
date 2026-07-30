@@ -28,7 +28,7 @@ def parse_value(value):
 
 def create_proxy_socket(args):
     if args.tor:
-        print("[+] Using Tor SOCKS5 proxy 127.0.0.1:9050")
+        # log("[+] Using Tor SOCKS5 proxy 127.0.0.1:9050")
         sock = socks.socksocket()
         sock.set_proxy(proxy_type=socks.SOCKS5, addr="127.0.0.1", port=9050)
         sock.settimeout(args.timeout)
@@ -44,7 +44,7 @@ def create_proxy_socket(args):
         if url.scheme not in proxy_map:
             raise SystemExit("[!] Only socks4:// and socks5:// are supported")
 
-        print(f"[+] Using proxy {url.hostname}:{url.port}")
+        # log(f"[+] Using proxy {url.hostname}:{url.port}")
         sock = socks.socksocket()
         sock.set_proxy(
             proxy_type=proxy_map[url.scheme],
