@@ -242,7 +242,7 @@ def probe_subdomains(args, subdomains: list, max_threads: int = 25, hide_suspici
         }
     return results
 
-def get_subdomains(args, domain: str) -> list:
+def get_subdomains(args, domain: str) -> dict:
     results = {}
 
     # -------------------------
@@ -590,3 +590,4 @@ def get_subdomains(args, domain: str) -> list:
                             "suspicious": suspicious
                         }
                 })
+    return results
