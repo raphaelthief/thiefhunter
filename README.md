@@ -528,6 +528,29 @@ RECON / ENUMERATION
           - If no token is provided, subdomain enumeration will rely only on crt.sh 
             and brute-force fuzzing using the tool's built-in subdomain wordlist.
 
+  --bucket
+      Detect potential cloud storage resources linked to the target domain
+
+      Supported providers:
+          - AWS S3 buckets
+          - Azure Blob Storage containers
+
+      Features:
+          - Generates bucket/container names from the domain name
+          - Uses custom wordlists
+          - Can enrich enumeration with discovered subdomains
+          - Checks public exposure and availability
+
+      Notes:
+          - Use --subdomains to collect additional names from existing subdomains
+          - Results may include protected resources (403 AccessDenied)
+          - Cloud providers may return false positives due to shared infrastructure
+          - Tor usage can affect cloud storage detection accuracy
+
+      Example:
+          --bucket
+          --subdomains --bucket
+
   --dir
       Enumeration and testing of common directories and sensitive files
       from the target domain root.
