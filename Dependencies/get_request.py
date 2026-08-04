@@ -199,6 +199,7 @@ def get_request(args, url, **kwargs):
                     tqdm.write(f"{Y}Results may be incomplete.{W}")
                     tqdm.write(f"{Y}{'─' * 40}{W}")
                     _connection_warning_shown = True
+        # print(type(e), repr(e))
         return None
 
     except requests.exceptions.ConnectTimeout:
@@ -210,6 +211,7 @@ def get_request(args, url, **kwargs):
 
     except Exception as e:
         handle_error(e, "Request error", args.verbose)
+        # print(type(e), repr(e))
         return None
 
 
