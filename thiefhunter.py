@@ -30,6 +30,7 @@ from Dependencies.auth_401.basic_auth import fuzz_auth
 from Dependencies.Wordpress_auth.automated_wordpress_bruteforce import wordpress_fuzz
 from Dependencies.port_scanner_TCP.tcp_scan import services_scanner
 from Dependencies.ssh_bruteforce.ssh import dossh
+from Dependencies.bucket_detection.detect_bucket import dobucket
 
 
 def handle_exit(sig, frame):
@@ -439,15 +440,6 @@ def process_target(args, target_url):
 
 
     # -------------------------
-    # Subdomains
-    # -------------------------
-    if local_args.subdomains:
-        if isargsok(local_args, "need_url"):
-            extracted_domain = extract_strictdomain(local_args.url)
-            get_subdomains(local_args, extracted_domain)
-
-
-    # -------------------------
     # Directory and files enum
     # -------------------------
     if local_args.dir:
@@ -533,18 +525,18 @@ def process_target(args, target_url):
     # BASIC AUTH FUZZER (401)
     # -------------------------
     if local_args.basicauth:
-        print(f"\n{Y}[!] Basic auth on {C}{args.url}")
+        print(f"\n{Y}[!] Basic auth on {C}{local_args.url}")
         if isargsok(local_args, "need_fuzzer"):
-            fuzz_auth(args)
+            fuzz_auth(local_args)
 
 
     # -------------------------
     # WORDPRESS FUZZER (login)
     # -------------------------
     if local_args.wordpress:
-        print(f"\n{Y}[!] Wordpress auth fuzzer on {args.url}")
+        print(f"\n{Y}[!] Wordpress fuzzer on {local_args.url}")
         if isargsok(local_args, "need_fuzzer_wp"):
-            wordpress_fuzz(args)
+            wordpress_fuzz(local_args)
 
 
     # -------------------------
@@ -554,7 +546,7 @@ def process_target(args, target_url):
         extracted_domain = extract_domain(local_args.url)
         print(f"\n{Y}[!] TCP scan on {extracted_domain}{W}")
         if isargsok(local_args, "need_url"):
-            asyncio.run(services_scanner(args, extracted_domain))
+            asyncio.run(services_scanner(local_args, extracted_domain))
 
 
     # -------------------------
@@ -564,7 +556,28 @@ def process_target(args, target_url):
         extracted_domain = extract_domain(local_args.url)
         print(f"\n{Y}[!] SSH bruteforce on {extracted_domain}{W}")
         if isargsok(local_args, "need_fuzzer"):
-            dossh(args, extracted_domain)
+            dossh(local_args, extracted_domain)
+
+
+    # -------------------------
+    # Subdomains
+    # -------------------------
+    found_subdomains  = []
+    if local_args.subdomains:
+        if isargsok(local_args, "need_url"):
+            extracted_domain = extract_strictdomain(local_args.url)
+            sub_results  = get_subdomains(local_args, extracted_domain)
+            found_subdomains = list(sub_results.keys())
+
+
+    # -------------------------
+    # BUCKET DETECTION
+    # -------------------------
+    if local_args.bucket:
+        extracted_domain = extract_domain(local_args.url)
+        print(f"\n{Y}[!] Bucket search on {extracted_domain}{W}")
+        if isargsok(local_args, "need_url"):
+            dobucket(local_args, extracted_domain, extra_words=found_subdomains)
 
 
 def main():
@@ -592,6 +605,7 @@ def main():
     parser.add_argument("--exp", "--exploit-search", dest="exploit_search", help='Search exploit from technologie and version (--exploit-search "PHP 8.1" or --exploit-search CVE-2026-8838 or --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*)')
     parser.add_argument("--audit", action="store_true", help="Perform basic checks on missing headers and configurations")
     parser.add_argument("--sub", "--subdomains", dest="subdomains", action="store_true", help="Detect target subdomains (DNSDumpster, VirusTotal API key needed)")
+    parser.add_argument("--bucket", action="store_true", help="Try to detect AWS S3 buckets and Azure Blob containers based on the domain name. Use --subdomains to add more specific wordlist to this enumeration")
     parser.add_argument("--tld", action="store_true", help="Detect new dns extension target (target.to becoming target.cz for exemple")
     parser.add_argument("--trav", "--traversal", dest="traversal", action="store_true", help="Try path traversal on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
     parser.add_argument("--ord", "--open-redirect", dest="open_redirect", action="store_true", help="Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
@@ -683,7 +697,7 @@ def main():
         # -------------------------
         if args.save:
             if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                print(f"\n{Y}[!] {W}Generating the JSON repor...")
+                print(f"\n{Y}[!] {W}Generating the JSON report...")
                 filename = save_report(args)
                 print(f"{G}[+] {W}Report saved to {filename}")
 
