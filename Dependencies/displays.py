@@ -86,6 +86,39 @@ GENERAL OPTIONS
                 Dependencies/get_request.py
 
 
+SAVE OPTIONS
+───────────────────────────────────────────────────────────────────────{G}
+  {C}--save{G}
+      Save scan results as a structured JSON report
+
+      Notes:
+          The generated file contains:
+              • Target information
+              • Module execution results
+              • Findings and collected data
+
+          Filename is automatically generated from the target domain
+          unless a custom output filename is provided
+
+
+  {C}--save-burp{G}
+      Save HTTP requests and responses as a HAR file for Burp Suite
+
+      Notes:
+          The generated HAR file contains:
+              • HTTP methods and URLs
+              • Request headers
+              • Response status codes
+              • Response headers
+              • Response body content
+
+          Useful for:
+              • Reviewing requests in Burp Suite
+              • Replaying HTTP traffic
+              • Debugging scanners and modules
+              • Analyzing raw HTTP behavior
+
+
 {Y}TARGETS
 ───────────────────────────────────────────────────────────────────────{G}
   {C}-u, --url <url>{G}
