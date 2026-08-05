@@ -1,6 +1,7 @@
 import os, traceback
 from colorama import init, Fore, Style
 from pathlib import Path
+from tqdm import tqdm
 
 
 M = Fore.MAGENTA
@@ -868,12 +869,12 @@ def handle_error(e, context=None, verbose=False):
         tb = traceback.extract_tb(e.__traceback__)[-1]
         filename = tb.filename
         line = tb.lineno
-        print(
+        tqdm.write(
             f"{prefix}{error_type}: {error_message} "
             f"(file={filename}, line={line}){W}"
         )
     else:
-        print(f"{prefix}{error_type}: {W}{error_message}{W}")
+        tqdm.write(f"{prefix}{error_type}: {W}{error_message}{W}")
 
 
 def ensure_http(url: str) -> str:
