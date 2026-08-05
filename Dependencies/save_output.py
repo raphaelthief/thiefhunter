@@ -95,7 +95,6 @@ class HARRecorder:
                 },
 
                 "response": {
-                "response": {
                     "status": response.status_code,
                     "statusText": "",
                     "httpVersion": "HTTP/1.1",
