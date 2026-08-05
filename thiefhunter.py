@@ -1,6 +1,7 @@
 import argparse, sys, json, re, signal, base64, io, asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import redirect_stdout
+from datetime import datetime
 from Dependencies.displays import isargsok, clear_screen, print_banner, help_menu, no_clean, M, W, R, Y, G, C, highlight, handle_error, init_env_file, ensure_http
 from Dependencies.save_output import init_report, save_report, add_result
 from Dependencies.url_parse import extract_domain, extract_strictdomain, extract_params
@@ -31,6 +32,7 @@ from Dependencies.Wordpress_auth.automated_wordpress_bruteforce import wordpress
 from Dependencies.port_scanner_TCP.tcp_scan import services_scanner
 from Dependencies.ssh_bruteforce.ssh import dossh
 from Dependencies.bucket_detection.detect_bucket import dobucket
+from Dependencies.get_request import HAR
 
 
 def handle_exit(sig, frame):
@@ -248,21 +250,21 @@ def process_target(args, target_url):
                 print(f"{G}[+] APIs")
                 for r in data["apis"]:
                     if is_sensitive_url(r):
-                        print(f"{G}    - {highlight({r['value']}, R)} {Y}({r['page']}:{r['line']})")
+                        print(f"{G}    - {highlight(r['value'], R)} {Y}({r['page']}:{r['line']})")
                     else:
                         print(f"{G}    - {W}{r['value']} {Y}({r['page']}:{r['line']})")
-                    
+
                     if args.save:
                         add_result("Secrets_WTF_scan", {
                             "type": "apis",
                             "data": {
-                                "api_found": {r['value']},
+                                "api_found": r["value"],
                                 "page": r["page"],
                                 "line": r["line"]
                             }
                         })
                 print()
-                
+
             if data["sensitive_keywords"]:
                 print(f"{G}[+] Sensitive keywords")
 
@@ -580,6 +582,15 @@ def process_target(args, target_url):
             dobucket(local_args, extracted_domain, extra_words=found_subdomains)
 
 
+    # -------------------------
+    # SAVE TO .HAR BURP FILE
+    # -------------------------
+    if local_args.save_burp:
+        print(f"\n{Y}[!] {W}Generating the HAR report...")
+        HAR.save()
+        print(f"{G}[+] {W}Report saved to {datetime.now().strftime("%d-%m-%y-%H-%M.har")}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Automated Bug Hunting and Pentesting Tool")
     parser.add_argument("-hh", action="store_true", help="Show full help menu")
@@ -624,6 +635,7 @@ def main():
     parser.add_argument("-P", "--password", help="password or @passwords_filepath")
     parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
     parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
+    parser.add_argument("--save-burp", action="store_true", help="Save HTTP requests to HAR file for Burp Suite")
     parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>)")
     
     args = parser.parse_args()
@@ -725,7 +737,7 @@ def main():
         # -------------------------
         if args.save:
             if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                print(f"\n{Y}[!] {W}Generating the JSON repor...")
+                print(f"\n{Y}[!] {W}Generating the JSON report...")
                 filename = save_report(args)
                 print(f"{G}[+] {W}Report saved to {filename}")
 
