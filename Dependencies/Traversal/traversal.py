@@ -70,14 +70,17 @@ base_windows = [
 # HELPERS
 # ----------------------------
 def detect_os_from_headers(args, url):
-    response = get_request(args, url)
-    server = response.headers.get("Server", "").lower()
-    if "win" in server or "microsoft" in server or "iis" in server:
-        return "windows"
+    try:
+        response = get_request(args, url)
+        server = response.headers.get("Server", "").lower()
+        if "win" in server or "microsoft" in server or "iis" in server:
+            return "windows"
 
-    if "unix" in server or "linux" in server or "apache" in server or "nginx" in server:
-        return "linux"
-    return "unknown"
+        if "unix" in server or "linux" in server or "apache" in server or "nginx" in server:
+            return "linux"
+        return "unknown"
+    except:
+        return "unknown"
 
 def normalize_netloc(netloc: str) -> str:
     return netloc.lower().replace("www.", "")
