@@ -42,6 +42,36 @@ GITHUB_API_KEY=
 
 
 
+## HAR BURP SETUP
+
+To use the generated .har file with ``--save-burp``, please configure Burp Suite as follows:
+
+- Download Jython:
+https://repo1.maven.org/maven2/org/python/jython-standalone/2.7.3/
+
+The following version has been tested: ``jython-standalone-2.7.3.jar``
+
+- Download the following Burp Suite Python extension:
+https://github.com/PortSwigger/harbringer
+
+For installation, proceed as follows:
+
+- Step 1:
+
+Go to: ``Settings --> Extensions --> Core extension settings --> Python environment``
+
+Set the path to the downloaded jython-standalone file in: "Location of Jython standalone jar file"
+
+- Step 2:
+
+Go to: ``Extensions --> Add --> Extension details``
+
+Configure the following:
+
+Set ``Extension type`` to: Python
+
+In ``Extension file``, specify the path to the Python file from the downloaded Harbringer project.
+
 
 ## Key Features
 ### Save results
@@ -350,6 +380,39 @@ PROXY / NETWORK
           - Uses SOCKS5h to avoid DNS leaks
           - If Tor runs on another port, edit:
                 Dependencies/get_request.py
+
+
+SAVE OPTIONS
+───────────────────────────────────────────────────────────────────────
+  --save
+      Save scan results as a structured JSON report
+
+      Notes:
+          The generated file contains:
+              • Target information
+              • Module execution results
+              • Findings and collected data
+
+          Filename is automatically generated from the target domain
+          unless a custom output filename is provided
+
+
+  --save-burp
+      Save HTTP requests and responses as a HAR file for Burp Suite
+
+      Notes:
+          The generated HAR file contains:
+              • HTTP methods and URLs
+              • Request headers
+              • Response status codes
+              • Response headers
+              • Response body content
+
+          Useful for:
+              • Reviewing requests in Burp Suite
+              • Replaying HTTP traffic
+              • Debugging scanners and modules
+              • Analyzing raw HTTP behavior
 
 
 TARGETS
