@@ -729,7 +729,7 @@ def wtf_scan(start_url, args, max_depth=2):
         "phones": sorted(found_phones, key=lambda x: x["value"]),
         "secrets": sorted(found_secrets, key=lambda x: x["value"]),
         "robots": sorted(robots_urls),
-        "apis": sorted(found_apis),
+        "apis": sorted(found_apis, key=lambda x: x["value"]),
         "sensitive_keywords": sorted(found_sensitive_keywords, key=lambda x: x["value"]),
         "sensitive_urls": sorted(found_sensitive_urls, key=lambda x: x["value"]),
         "subdomains": sorted(found_subdomains),
