@@ -86,7 +86,7 @@ GENERAL OPTIONS
                 Dependencies/get_request.py
 
 
-SAVE OPTIONS
+{Y}SAVE OPTIONS
 ───────────────────────────────────────────────────────────────────────{G}
   {C}--save{G}
       Save scan results as a structured JSON report
