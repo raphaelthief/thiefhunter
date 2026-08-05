@@ -2,7 +2,9 @@ import requests, random, socket, ssl, socks, threading
 from pathlib import Path
 from urllib.parse import urlparse
 from tqdm import tqdm
+from datetime import datetime
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
+from Dependencies.save_output import HARRecorder
 
 
 # =========================================================
@@ -28,6 +30,8 @@ DEFAULT_HEADERS = {
 
 BASE_DIR = Path(__file__).resolve().parent
 UA_FILE = BASE_DIR / "Payloads" / "user_agents.txt"
+
+HAR = HARRecorder(datetime.now().strftime("%d-%m-%y-%H-%M.har"))
 
 
 def load_user_agents(path=UA_FILE):
@@ -180,7 +184,10 @@ def get_request(args, url, **kwargs):
             allow_redirects=kwargs.get("allow_redirects", True),
             auth=kwargs.get("auth")
         )
-        
+
+        if getattr(args, "save_burp", False):
+            HAR.add(method, url, final_headers, kwargs.get("data"), response)
+
         return response
     except requests.exceptions.ConnectionError as e:
         global _connection_abort_count, _connection_warning_shown
@@ -359,24 +366,34 @@ def get_request_socket(args, url, headers=None):
         # =====================================================
         class ResponseWrapper:
             def __init__(self, raw):
-                self.text = raw
-                try:
-                    self.status_code = int(raw.split("\r\n")[0].split(" ")[1])
-                except Exception:
-                    self.status_code = 0
-
+                self.raw = raw
+                self.status_code = 0
                 self.headers = {}
+                self.text = ""
+
                 try:
-                    header_block = raw.split("\r\n\r\n", 1)[0]
-                    lines = header_block.split("\r\n")[1:]
-                    for line in lines:
+                    header_block, body = raw.split("\r\n\r\n", 1)
+                    self.text = body
+
+                    status_line = header_block.split("\r\n")[0]
+                    self.status_code = int(status_line.split()[1])
+
+                    for line in header_block.split("\r\n")[1:]:
                         if ":" in line:
                             k, v = line.split(":", 1)
                             self.headers[k.strip()] = v.strip()
+
                 except Exception:
                     pass
 
-        return ResponseWrapper(raw_response)
+
+        response = ResponseWrapper(raw_response)
+
+        if getattr(args, "save_burp", False):
+            HAR.add(method, url, final_headers, None, response)
+
+        return response
+        #return ResponseWrapper(raw_response)
     except Exception as e:
         handle_error(e, "SOCKET Request error", args.verbose)
         return None
