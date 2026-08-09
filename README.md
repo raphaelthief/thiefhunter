@@ -8,6 +8,68 @@ The tool focusses on adaptive offensive automation with practical OPSEC awarenes
 
 To see the account menu and the features related to the ```-hh``` menu, scroll to the end of this description.
 
+## Main features
+```
+usage: thiefhunter.py [-h] [-hh] [-nc] [--jwt JWT] [-u URL] [-f FILE] [--random-headers] [-v] [--proxy PROXY] [--tor] [-t TIMEOUT] [--headers HEADERS] [--cookies COOKIES] [-X {GET,POST,PUT,DELETE}] [-e EXTRACT] [-w] [--exclude EXCLUDE] [--show-all] [--reflect REFLECT] [--wtf WTF] [--vln] [--dir {1,2,3,4}] [--exp EXPLOIT_SEARCH] [--audit] [--sub] [--bucket] [--tld] [--trav] [--ord] [--crlf] [--waf] [--favicon] [--tcp-scan] [--ssh-info] [-p PORT] [-c CONCURRENCY] [--bypass-403] [--basicauth] [--force-ssh] [-wp] [-U USER] [-P PASSWORD] [--batch] [--save] [--save-burp] [--commits COMMITS]
+
+Automated Bug Hunting and Pentesting Tool
+
+options:
+  -h, --help            show this help message and exit
+  -hh                   Show full help menu
+  -nc, --no-clean       Do not clean the CLI
+  --jwt JWT             Check JWT Bearer Token (--jwt JWT_TOKEN)
+  -u, --url URL         Target URL to scan
+  -f, --file FILE       Targets URL to scan from file
+  --random-headers      Use random User-Agent for each requests from the header file (paylaods) instead of default one
+  -v, --verbose         Enable Verbose mode
+  --proxy PROXY         Custom proxy (--proxy http://user:pass@host:port)
+  --tor                 Force use of Tor SOCKSH proxy (127.0.0.1:9050)
+  -t, --timeout TIMEOUT
+                        Request timeout in seconds (default: 60 and set to 7 for --tcp-scan)
+  --headers HEADERS     Custom headers as JSON string (--headers "Accept=application/json,Authorization=Bearer TOKEN")
+  --cookies COOKIES     Cookies as JSON string (--cookies "session=abc123; token=xyz789")
+  -X, --method {GET,POST,PUT,DELETE}
+                        HTTP method (default: GET)
+  -e, --extract EXTRACT
+                        Crawl and extract URLs with parameters (--extract 2)
+  -w, --wayback         Extract Wayback Machine URLs
+  --exclude EXCLUDE     Exclude extensions from --wayback (comma separated, e.g: png,jpg,css,js)
+  --show-all            Show all URLs from --wayback (default = only URLs with parameters)
+  --reflect REFLECT     Crawl the target up to N levels deep and test query parameters for reflection and SQL errors (--reflect 3)
+  --wtf WTF             Deep scan: extract emails, phones, secrets + robots.txt (--wtf 3)
+  --vln, --vuln         Detect vulnerable versions and associated CVE and exploits
+  --dir {1,2,3,4}       Directory fuzzing level (1=Low 2=Moderate 3=Medium 4=High)
+  --exp, --exploit-search EXPLOIT_SEARCH
+                        Search exploit from technologie and version (--exploit-search "PHP 8.1" or --exploit-search CVE-2026-8838 or --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*)
+  --audit               Perform basic checks on missing headers and configurations
+  --sub, --subdomains   Detect target subdomains (DNSDumpster, VirusTotal API key needed)
+  --bucket              Try to detect AWS S3 buckets and Azure Blob containers based on the domain name. Use --subdomains to add more specific wordlist to this enumeration
+  --tld                 Detect new dns extension target (target.to becoming target.cz for exemple
+  --trav, --traversal   Try path traversal on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)
+  --ord, --open-redirect
+                        Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)
+  --crlf                Try to detect crlf injections
+  --waf                 Try to detect WAF application
+  --favicon             Try to detect favicon hash
+  --tcp-scan            TCP scanner compatible with --proxy and --tor. 100 defaults ports scanned if you don't provide --ports. Use --verbose to see filtered and closed ports
+  --ssh-info            SSH authentications analysis
+  -p, --port PORT       Ports to scan (--port 22,80,443 or --port 1-150) or a list of ports (--port @ports_filepath) or port to connect for --force-ssh (default: 22)
+  -c, --concurrency CONCURRENCY
+                        Setup concurrency for TCP scan (default: 150) or --force-ssh (default: 1)
+  --bypass-403          Attempt 403 bypass techniques
+  --basicauth           Attempt HTTP Basic Authentication. Requires --url (target), -U/--user and -P/--password
+  --force-ssh           Attempt SSH authentication bruteforce. Requires --url (target), -U/--user and -P/--password
+  -wp, --wordpress      Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.
+  -U, --user USER       username or @usernames_filepath
+  -P, --password PASSWORD
+                        password or @passwords_filepath
+  --batch               Never ask for user input, use the default behavior
+  --save                Save the results as a structured JSON file
+  --save-burp           Save HTTP requests to HAR file for Burp Suite
+  --commits COMMITS     Found related emails from Github commits (--commits <GITHUB_USERNAME>)
+```
+
 ## Installation
 ```
 pip install -r requirements.txt && playwright install
