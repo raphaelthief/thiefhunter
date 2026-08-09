@@ -33,6 +33,7 @@ from Dependencies.port_scanner_TCP.tcp_scan import services_scanner
 from Dependencies.ssh_bruteforce.ssh import dossh
 from Dependencies.bucket_detection.detect_bucket import dobucket
 from Dependencies.get_request import HAR
+from Dependencies.CrawlURLS.refelcted_injections import reflector
 
 
 def handle_exit(sig, frame):
@@ -583,6 +584,15 @@ def process_target(args, target_url):
 
 
     # -------------------------
+    # REFELCTED PARAMETERS
+    # -------------------------
+    if local_args.reflect:
+        print(f"\n{Y}[!] Search reflected values on {local_args.url}{W}")
+        if isargsok(local_args, "need_url"):
+            reflector(local_args)
+
+
+    # -------------------------
     # SAVE TO .HAR BURP FILE
     # -------------------------
     if local_args.save_burp:
@@ -610,6 +620,7 @@ def main():
     parser.add_argument("-w", "--wayback", action="store_true", help="Extract Wayback Machine URLs")
     parser.add_argument("--exclude", help="Exclude extensions from --wayback (comma separated, e.g: png,jpg,css,js)")
     parser.add_argument("--show-all", action="store_true", help="Show all URLs from --wayback (default = only URLs with parameters)")
+    parser.add_argument("--reflect", type=int, help="Crawl the target up to N levels deep and test query parameters for reflection and SQL errors (--reflect 3)")
     parser.add_argument("--wtf", type=int, help="Deep scan: extract emails, phones, secrets + robots.txt (--wtf 3)")
     parser.add_argument("--vln", "--vuln", dest="vuln", action="store_true", help="Detect vulnerable versions and associated CVE and exploits")
     parser.add_argument("--dir", type=int, choices=[1, 2, 3, 4], default=None, help="Directory fuzzing level (1=Low 2=Moderate 3=Medium 4=High)")
