@@ -279,6 +279,41 @@ GENERAL OPTIONS
       Example:
           --wtf 3
 
+    {C}--reflect <depth>{G}
+      Crawl and test reflected query parameters
+
+      Features:
+          - Recursive crawling
+          - Query parameter discovery
+          - Reflection detection
+          - HTML context detection
+          - Character encoding analysis
+          - HTML breakout testing
+          - SQL error disclosure detection
+          - Database fingerprinting from error messages
+
+      Tested contexts:
+          - HTML text
+          - HTML attributes
+          - JavaScript contexts
+
+      SQL databases detected:
+          - MySQL
+          - PostgreSQL
+          - MSSQL
+          - Oracle
+          - SQLite
+
+      Notes:
+          - Crawl depth controls the maximum recursion level
+          - Only same-domain links are followed
+          - Non-HTML resources are ignored
+          - Reflected parameters are tested for raw character reflection
+          - SQL errors are compared against the baseline response
+
+      Example:
+          --reflect 3
+
   {C}--sub, --subdomains{G}
       Enumerate subdomains
 
