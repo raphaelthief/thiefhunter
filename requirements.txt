@@ -20,3 +20,4 @@ tqdm
 mmh3
 paramiko
 python-socks
+html5lib
