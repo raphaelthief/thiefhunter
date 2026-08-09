@@ -31,7 +31,7 @@ POST_TEMPLATES = {
 tested_listings = set()
 discovered_listings = set()
 
-def crawl_directory_listing(args, listing_url, visited=None, depth=0):
+def crawl_directory_listing(args, listing_url, visited=None, prefix="", is_root=True):
     if visited is None:
         visited = set()
 
@@ -40,30 +40,24 @@ def crawl_directory_listing(args, listing_url, visited=None, depth=0):
 
     visited.add(listing_url)
     response = get_request(args, listing_url, timeout=30, allow_redirects=False)
-
     if not response or response == "timeout":
         return
 
-    indent = "│   " * depth
-    if depth == 0:
+    if is_root:
         print(f"\n{G}[LISTING]{W} {listing_url}")
 
-    entries = re.findall(
-        r'^([\-dlpscb])[rwxstST\-]{9}\s+\d+\s+\S+\s+\S+\s+\d+\s+\w+\s+\d+\s+(?:\d+:\d+|\d{4})\s+(.+)$',
-        response.text,
-        re.MULTILINE
-    )
-
+    entries = re.findall(r'^([\-dlpscb])[rwxstST\-]{9}\s+\d+\s+\S+\s+\S+\s+\d+\s+\w+\s+\d+\s+(?:\d+:\d+|\d{4})\s+(.+)$', response.text, re.MULTILINE)
     base_dir = listing_url.replace("/.listing", "/")
+    
     total_entries = [
-        (t, n.strip())
-        for t, n in entries
-        if n.strip() not in (".", "..")
+        (entry_type, name.strip())
+        for entry_type, name in entries
+        if name.strip() not in (".", "..")
     ]
 
     for index, (entry_type, name) in enumerate(total_entries):
         is_last = index == len(total_entries) - 1
-        branch = "└──" if is_last else "├──"
+        branch = "└── " if is_last else "├── "
         if " -> " in name:
             name = name.split(" -> ")[0]
 
@@ -71,30 +65,36 @@ def crawl_directory_listing(args, listing_url, visited=None, depth=0):
         if entry_type == "-":
             file_url = urljoin(base_dir, name)
             file_response = get_request(args, file_url, timeout=30, allow_redirects=False)
-
             if file_response and file_response != "timeout":
-                status = f"{R}{file_response.status_code}"
+                status = f"{R}{file_response.status_code}{W}"
             else:
-                status = f"{Y}[ERR]"
+                status = f"{Y}[ERR]{W}"
 
-            print(f"{G}{indent}{branch} {status} {W}{name}")
+            print(f"{G}{prefix}{branch}{status} {name}")
 
         # DIRECTORY
         elif entry_type == "d":
             next_listing = urljoin(base_dir, f"{name}/.listing")
             listing_response = get_request(args, next_listing, timeout=30, allow_redirects=False)
-            if listing_response and listing_response != "timeout":
-                status = listing_response.status_code
-            else:
-                status = "ERR"
 
-            print(f"{indent}{branch} {status} {W}{name}/")
-            if status == 200:
-                crawl_directory_listing(args, next_listing, visited, depth + 1)
+            if listing_response and listing_response != "timeout":
+                status_code = listing_response.status_code
+            else:
+                status_code = None
+
+            if status_code is not None:
+                status = f"{status_code}"
+            else:
+                status = "[ERR]"
+
+            print(f"{G}{prefix}{branch}{W}{status} {name}/")
+            if status_code == 200:
+                child_prefix = prefix + ("    " if is_last else "│   ")
+                crawl_directory_listing(args, next_listing, visited, prefix=child_prefix, is_root=False)
 
         # SYMLINK
         elif entry_type == "l":
-            print(f"{indent}{branch} {Y}[LINK] {W}{name}")
+            print(f"{G}{prefix}{branch}{Y}[LINK]{W} {name}")
 
 
 
@@ -117,6 +117,10 @@ def get_baseline(args, base_url):
 def analyze_response(target, response):
     discovered_dirs = []
     content = response.text.lower()
+
+    status = response.status_code
+    length = len(response.text)
+    words = len(response.text.split())
 
     # Directory listing
     if (
