@@ -404,6 +404,11 @@ SENSITIVE_KEYWORDS = [
     "config", "settings", "system",
     "monitor", "metrics", "health", "status",
 
+    # --- ERROR CONF DISPLAY ---
+    "_server", "_user", "_pass",  "_ftp", 
+    "private:", "public:", "_pass",  "/usr/share/",
+    "/home/", "_csrf", "_debug", "_environment",
+    
     # --- FILE OPS ---
     "upload", "uploads",
     "download", "file", "files",
