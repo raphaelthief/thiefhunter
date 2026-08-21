@@ -1,6 +1,6 @@
 import time
 from pathlib import Path
-from Dependencies.displays import M, W, R, Y, G, C
+from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.get_request import get_request
 
 
@@ -62,6 +62,11 @@ def fuzz_auth(args):
 
                 r = get_request(args, args.url, auth=(user, password), timeout=10, allow_redirects=False,)
 
+                if r is None:
+                    if args.verbose:
+                        print(f"{R}[!] Request failed for {user}:{password}{W}")
+                    continue
+                
                 # First 403 WAF
                 if not fuzzed and r.status_code == 403:
                     fuzzed = True
