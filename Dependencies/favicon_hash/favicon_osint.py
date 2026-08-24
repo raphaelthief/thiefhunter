@@ -12,8 +12,12 @@ def whatfavicon(args):
             args.url = "https://" + args.url
             
         parsed = urlparse(args.url)
-        url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
-        r = get_request(args, url, timeout=15)
+        if parsed.path.lower().endswith((".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg")):
+            favicon_url = args.url
+        else:
+            favicon_url = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+
+        r = get_request(args, favicon_url, timeout=15)
 
         if not r.status_code == 200:
             print(f"{M}[-] favicon.icon not found")
@@ -21,7 +25,8 @@ def whatfavicon(args):
             
         favicon = base64.b64encode(r.content)
         hash_found = mmh3.hash(favicon)
-        
+
+        print(f"{G}[+] Favicon URL    : {C}{favicon_url}")
         print(f"{G}[+] Hash          : {C}{hash_found}")
         print(f"{G}[+] Shodan filter : {C}http.favicon.hash:{hash_found}")
         print(f"{G}[+] Shodan        : {C}https://www.shodan.io/search?query=http.favicon.hash%3A{hash_found}")
