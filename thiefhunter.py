@@ -60,7 +60,7 @@ def process_target(args, target_url):
         if not is_jwt(args.jwt):
             handle_error("Invalid JWT format", "ERROR")
             return
-        analyze_jwt(args.jwt)
+        analyze_jwt(args, args.jwt)
         pg = JWTPlayground(args.jwt)
         
         try:
