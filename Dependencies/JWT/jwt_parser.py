@@ -4,7 +4,7 @@ from colorama import init, Fore, Style
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 
 
-def b64url_decode(data: str):
+def b64url_decode(args, data: str):
     padding = '=' * (-len(data) % 4)
     decoded = base64.urlsafe_b64decode(data + padding)
     try:
@@ -26,11 +26,11 @@ def format_dt(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-def analyze_jwt(token: str):
+def analyze_jwt(args, token: str):
     header_b64, payload_b64, signature = token.split('.')
 
-    header = b64url_decode(header_b64)
-    payload = b64url_decode(payload_b64)
+    header = b64url_decode(args, header_b64)
+    payload = b64url_decode(args, payload_b64)
 
     alg = header.get("alg", "inconnu")
     typ = header.get("typ", "inconnu")
