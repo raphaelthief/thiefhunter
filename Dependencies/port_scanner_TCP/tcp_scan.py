@@ -46,14 +46,21 @@ def get_latest_iana_file():
 def update_iana_file():
     filename = f"{IANA_FILE_PREFIX}{datetime.now().strftime('%Y-%m-%d')}.csv"
     filepath = BASE_DIR / filename
-    print(f"{Y}[!] Updating IANA services database...{W}")
-    urllib.request.urlretrieve(IANA_URL, filepath)
+    try:
+        print(f"{Y}[!] Updating IANA services database...{W}")
+        urllib.request.urlretrieve(IANA_URL, filepath)
+    except Exception as e:
+        handle_error(e, "ERROR")
+        return "fail"
     return filepath
 
 def load_iana_services():
     filepath = get_latest_iana_file()
     services = {}
-
+    if filepath == "fail":
+        if not os.path.exists(BASE_DIR.glob(f"{IANA_FILE_PREFIX}*.csv")):
+            return services
+            
     with open(filepath, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
