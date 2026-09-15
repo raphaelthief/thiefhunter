@@ -1,740 +1,161 @@
-import argparse, sys, json, re, signal, base64, io, asyncio
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import redirect_stdout
+import json
+from pathlib import Path
+from urllib.parse import urlparse
 from datetime import datetime
-from Dependencies.displays import isargsok, clear_screen, print_banner, help_menu, no_clean, M, W, R, Y, G, C, highlight, handle_error, init_env_file, ensure_http
-from Dependencies.save_output import init_report, save_report, add_result
-from Dependencies.url_parse import extract_domain, extract_strictdomain, extract_params
-from Dependencies.JWT.jwt_parser import analyze_jwt, print_jwt_analysis, is_jwt
-from Dependencies.JWT.jwt_payload import JWTPlayground
-from Dependencies.CrawlURLS.wayback import wayback_urls
-from Dependencies.CrawlURLS.crawl import crawl_extractit
-from Dependencies.CrawlURLS.wtf_scan import wtf_scan, is_personal_email, is_sensitive_url
-from Dependencies.Versions_detection.headers import extract_headers
-from Dependencies.Versions_detection.source import extract_assets_tech
-from Dependencies.Versions_detection.wordpress_vuln_displayer import extract_wordpress
-from Dependencies.Versions_detection.CVE_vuln_displayer import is_there_a_vuln, scan_all_versions
-from Dependencies.Subdomains.subdomains import get_subdomains, is_reverse_proxy
-from Dependencies.Traversal.traversal import detect_os_from_headers, crawl_extract, test_traversal
-from Dependencies.Open_redirect.openredirect import run_openredirect
-from Dependencies.get_request import ensure_tor_or_exit, resolve_ip
-from Dependencies.Audit.basic_checks import auditor
-from Dependencies.Audit.ssl_checks import ssl_that
-from Dependencies.crlf.crlf_headers import crlf_test
-from Dependencies.waf_detection.waf_detect import whatwaf
-from Dependencies.favicon_hash.favicon_osint import whatfavicon
-from Dependencies.github_commits.commits import repos
-from Dependencies.TLD.tld_enum import tld_main
-from Dependencies.dir_enum.dir_files_scan import do_fuzz_paths
-from Dependencies.do403_bypass.fuzzer_403 import do_403
-from Dependencies.auth_401.basic_auth import fuzz_auth
-from Dependencies.Wordpress_auth.automated_wordpress_bruteforce import wordpress_fuzz
-from Dependencies.port_scanner_TCP.tcp_scan import services_scanner
-from Dependencies.ssh_bruteforce.ssh import dossh
-from Dependencies.bucket_detection.detect_bucket import dobucket
-from Dependencies.get_request import HAR
-from Dependencies.CrawlURLS.refelcted_injections import reflector
 
 
-def handle_exit(sig, frame):
-    print(f"\n{R}[!] Ctrl+C detected, closing...")
-    sys.exit(0)
+REPORTS = {
+    "tool": {
+        "name": "thiefhunter",
+        "version": "v2",
+        "author": "raphaelthief"
+    },
+    "targets": []
+}
+CURRENT_REPORT = None
 
-signal.signal(signal.SIGINT, handle_exit)
 
+def normalize_url(url):
+    if url and not url.startswith(("http://", "https://")):
+        return f"https://{url}"
+    return url
 
-def process_target(args, target_url):
-    local_args = argparse.Namespace(**vars(args))
-    local_args.url = target_url
-    
-    if local_args.file:
-        print(f"\n{Y}{'='*60}")
-        print(f"{G}[TARGET] {W}{local_args.url}")
-        print(f"{Y}{'='*60}\n")
 
+def init_report(args, target=None):
+    global CURRENT_REPORT
 
-    # -------------------------
-    # JWT Tokens
-    # -------------------------
-    if args.jwt:
-        if not is_jwt(args.jwt):
-            handle_error("Invalid JWT format", "ERROR")
-            return
-        analyze_jwt(args, args.jwt)
-        pg = JWTPlayground(args.jwt)
-        
-        try:
-            pg = JWTPlayground(args.jwt)
-        except ValueError as e:
-            handle_error(e, "ERROR", args.verbose)
-            return
-        
-        tests = pg.generate()
-        for t in tests:
-            print(f"{G}[*] {t.name}{W}")
-            print(
-                f"{Y}[signature] "
-                f"{t.signature_status}{W}"
-            )
+    CURRENT_REPORT = {
+        "target": normalize_url(target) if target else None,
+        "modules": {}
+    }
 
-            print(t.token)
-            print()
+    if not target and args.commits:
+        CURRENT_REPORT["commits"] = args.commits
 
-    # -------------------------
-    # GITHUB COMMITS
-    # -------------------------
-    if local_args.commits:
-        isargsok(local_args, "need_commit")
-        repos(args, local_args.commits)
+    REPORTS["targets"].append(CURRENT_REPORT)
 
 
-    # -------------------------
-    # Wayback URLs
-    # -------------------------
-    if local_args.exclude:
-        isargsok(local_args, "need_wayback_or_extract")
+def add_result(module, result):
+    if CURRENT_REPORT is None:
+        return
 
-    if local_args.show_all:
-        isargsok(local_args, "need_wayback_or_extract")
+    CURRENT_REPORT["modules"].setdefault(module, [])
+    CURRENT_REPORT["modules"][module].append(result)
 
-    if local_args.wayback:
-        if isargsok(local_args, "need_url"):
-            extracted_domain = extract_domain(local_args.url)
-            exclude_ext = None
-            if local_args.exclude:
-                exclude_ext = [
-                    f".{ext.strip().lower().lstrip('.')}"
-                    for ext in local_args.exclude.split(",")
-                ]
 
-            wayback_output, total, filtered = wayback_urls(local_args, extracted_domain, exclude_ext=exclude_ext, show_all=local_args.show_all)
-            for i, url in enumerate(wayback_output, 1):
-                print(f"{G}[{i:04}] {W}{url}")
-                if args.save:
-                    add_result("Wayback_machine", {
-                        "url": f"{url}"
-                    })
-
-            print(f"\n{G}[+] Found {len(wayback_output)} URLs")
-            print(f"{G}[*] {filtered} URLs filtered (assets / no params / excluded)")
-
-
-    # -------------------------
-    # Crawl URLs with parameters
-    # -------------------------
-    if local_args.extract:
-        if isargsok(local_args, "need_url"):
-            exclude_ext = None
-            if local_args.exclude:
-                exclude_ext = [
-                    f".{ext.strip().lower().lstrip('.')}"
-                    for ext in local_args.exclude.split(",")
-                ]
-                
-            print(f"{C}[!] {G}Crawling with depth {local_args.extract}")
-            crawl_extractit(local_args, local_args.url, max_depth=local_args.extract, exclude_ext=exclude_ext, show_all=local_args.show_all)
-
-
-    # -------------------------
-    # Search for URLs, API, emails, phones, conf files
-    # -------------------------
-    if local_args.wtf:
-        if isargsok(local_args, "need_url"):
-            print(f"{C}[!] {G}Running WTF scan (depth={local_args.wtf})")
-            data = wtf_scan(local_args.url, local_args, max_depth=local_args.wtf)
-            print()
-            
-            if data["emails"]:
-                print(f"{G}[+] Emails")
-                extracted_domain = extract_strictdomain(local_args.url)
-                for e in data["emails"]:
-                    email = e["value"]
-                    page = e["page"]
-                    line = e["line"]
-
-                    if is_personal_email(email, extracted_domain):
-                        print(f"{G}    - {highlight(email, R)} {Y}({page}:{line})")
-                    else:
-                        print(f"{G}    - {W}{email} {Y}({page}:{line})")
-                        
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "emails",
-                            "data": {
-                                "email_found": email,
-                                "page": page,
-                                "line": line
-                            }
-                        })
-                print()
-
-            if data["phones"]:
-                print(f"{G}[+] Phones (FR - 06 / 07)")
-                for p in data["phones"]:
-                    print(f"{G}    - {W}{p['value']} {Y}({p['page']}:{p['line']})")
-
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "phones",
-                            "data": {
-                                "phone_found": p["value"],
-                                "page": p["page"],
-                                "line": p["line"]
-                            }
-                        })
-                print()
-
-            if data["secrets"]:
-                print(f"{G}[+] Secrets")
-                for s in data["secrets"]:
-                    print(f"{G}    - {W}{s['value']} {Y}({s['page']}:{s['line']})")
-
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "secrets",
-                            "data": {
-                                "secret_found": s["value"],
-                                "page": s["page"],
-                                "line": s["line"]
-                            }
-                        })
-                print()
-
-            if data["robots"]:
-                print(f"{G}[+] robots.txt - Disallowed")
-                for r in data["robots"]:
-                    if is_sensitive_url(r):
-                        print(f"{G}    - {highlight(r, R)}")
-                    else:
-                        print(f"{G}    - {W}{r}")
-
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "robots",
-                            "data": {
-                                "robots_found": r
-                            }
-                        })
-                print()
-
-            if data["subdomains"]:
-                print(f"{G}[+] Detected subdomains")
-                for r in data["subdomains"]:
-                    print(f"{G}    - {W}{r}")
-
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "subdomains",
-                            "data": {
-                                "subdomain_found": r
-                            }
-                        })
-                print()
-
-            if data["apis"]:
-                print(f"{G}[+] APIs")
-                for r in data["apis"]:
-                    if is_sensitive_url(r):
-                        print(f"{G}    - {highlight(r['value'], R)} {Y}({r['page']}:{r['line']})")
-                    else:
-                        print(f"{G}    - {W}{r['value']} {Y}({r['page']}:{r['line']})")
-
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "apis",
-                            "data": {
-                                "api_found": r["value"],
-                                "page": r["page"],
-                                "line": r["line"]
-                            }
-                        })
-                print()
-
-            if data["sensitive_keywords"]:
-                print(f"{G}[+] Sensitive keywords")
-
-                for r in data["sensitive_keywords"]:
-                    print(f"{G}    - {W}{r['value']} {Y}({r['page']}:{r['line']})")
-
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "sensitive_keyword",
-                            "data": {
-                                "keyword_found": r["value"],
-                                "page": r["page"],
-                                "line": r["line"]
-                            }
-                        })
-
-                print()
-
-            if data["sensitive_urls"]:
-                print(f"{G}[+] Sensitive urls")
-
-                for p in data["sensitive_urls"]:
-                    url = p["value"]
-
-                    if is_sensitive_url(url):
-                        print(f"{G}    - {highlight(url, R)} {Y}({p['page']}:{p['line']})")
-                    else:
-                        print(f"{G}    - {W}{url} {Y}({p['page']}:{p['line']})")
-
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "sensitive_urls",
-                            "data": {
-                                "url_found": url,
-                                "page": p["page"],
-                                "line": p["line"]
-                            }
-                        })
-
-                print()
-
-            if data.get("base64"):
-                print(f"{G}[+] BASE64 decoded content")
-                for b in data["base64"]:
-                    print(
-                        f"{G}    - {W}{b['value']} {Y}({b['page']}:{b['line']})"
-                    )
-
-                    if args.save:
-                        add_result("Secrets_WTF_scan", {
-                            "type": "base64_text",
-                            "data": {
-                                "b64_found": b["value"],
-                                "page": b["page"],
-                                "line": b["line"]
-                            }
-                        })
-                print()
-
-            if not any(data.values()):
-                print(f"{R}[-] Nothing found")
-                if args.save:
-                    add_result("Secrets_WTF_scan", {
-                        "results": "nothing found"
-                    })
-
-
-    # -------------------------
-    # Search for versions and associated CVE and exploits
-    # -------------------------
-    if local_args.vuln:
-        if isargsok(local_args, "need_url"):
-            seen_headers = set()
-            seen_all = set()
-            versions_list = []
-            def normalize(name):
-                return re.sub(r"[^a-z0-9]", "", name.lower())
-
-            def is_valid_version(version): # allow: 1.2 - 1.2.3 - 4.9.7.2
-                return bool(re.fullmatch(r"\d+(?:\.\d+){1,4}", version))
-
-            print(f"\n{C}[+] Versions and vulnerabilities detection")
-            techs = extract_headers(local_args, local_args.url)
-            if techs:
-                print(f"{G}[+] Headers detection")
-                for t in techs:
-                    tech_name = t["tech"]
-                    version = t["version"]
-                    full = f"{tech_name} {version}" if version else tech_name
-                    key = normalize(full)
-                    if key not in seen_all:
-                        seen_all.add(key)
-                        seen_headers.add(key)
-                        print(f"    {G}- {highlight(full, Y)}")
-                        
-                        if args.save:
-                            add_result("Version_and_vuln_detection", {
-                                "Type": "headers",
-                                    "data": {
-                                        "Name": tech_name,
-                                        "Version": version
-                                    }
-                            })
-
-                    if version and is_valid_version(version):
-                        versions_list.append({
-                            "name": tech_name,
-                            "version": version
-                        })
-                print()
-                
-            tech = extract_assets_tech(local_args, local_args.url)
-            if tech:
-                print(f"{G}[+] Assets detection")
-                for name, version in tech:
-                    full = f"{name} {version}".strip() if version else name
-                    key = normalize(full)
-                    if key in seen_headers:
-                        continue
-
-                    if key not in seen_all:
-                        seen_all.add(key)
-                        print(f"    {G}- {highlight(full, Y)}")
-                        
-                        if args.save:
-                            add_result("Version_and_vuln_detection", {
-                                "Type": "Assets",
-                                    "data": {
-                                        "Name": name,
-                                        "Version": version
-                                    }
-                            })
-                        
-                        versions_list.append({
-                            "name": name,
-                            "version": version
-                        })
-        filtered = [
-            item for item in versions_list
-            if item.get("version") and item["version"].strip()
-        ]
-        extract_wordpress(filtered, local_args)
-        versions_dict = {
-            local_args.url: {
-                item["name"]: {"version": item["version"]}
-                for item in filtered
-            }
-        }
-        is_there_a_vuln(versions_dict, local_args)
-
-
-    # -------------------------
-    # Search specific vuln
-    # -------------------------
-    if local_args.exploit_search:
-        print(f"\n{C}[+] Search-vulns scan")
-        scan_all_versions(local_args.exploit_search, local_args)
-
-    # -------------------------
-    # Audit (basic checks)
-    # -------------------------
-    if local_args.audit:
-        if isargsok(local_args, "need_url"):
-            auditor(local_args)
-            extracted_domain = extract_strictdomain(local_args.url)
-            ssl_that(extracted_domain, local_args)
-            ip = resolve_ip(local_args, extracted_domain)
-            if ip:
-                ip_b64 = base64.b64encode(ip.encode("utf-8"))
-                print(f"{Y}\n[!] {G}Interesting urls to visit")
-                print(f" {G}- {W}https://www.shodan.io/host/{ip}")
-                print(f' {G}- {W}https://platform.censys.io/search?q=host.ip%3D"{ip}"')
-                print(f" {G}- {W}https://en.fofa.info/result?qbase64={ip_b64}%3D")
-                print(f" {G}- {W}https://www.virustotal.com/gui/ip-address/{ip}/details")
-
-
-    # -------------------------
-    # Directory and files enum
-    # -------------------------
-    if local_args.dir:
-        if isargsok(local_args, "need_url"):
-            do_fuzz_paths(local_args)
-
-
-    # -------------------------
-    # 403 bypass
-    # -------------------------
-    if local_args.bypass_403:
-        if isargsok(local_args, "need_url"):
-            do_403(local_args)
-
-    # -------------------------
-    # Path traversal
-    # -------------------------
-    if local_args.traversal:
-        if isargsok(local_args, "need_url"):
-            OS_type = detect_os_from_headers(local_args, local_args.url)
-            parsed = extract_params(local_args.url)
-            if parsed["params"]:
-                print(f"{Y}[!] {W}Endpoint detected: {parsed['params']}")
-                for param in parsed["params"]:
-                    print(f"{Y}[*] {W}Testing param: {param}")
-                    test_traversal(local_args, parsed["base"], param, OS_type)
-            else:
-                print(f"{R}[-] {W}No endpoint found in URL, starting crawl...")
-                endpoints = crawl_extract(local_args, local_args.url, max_depth=2)
-                if not endpoints:
-                    print(f"{R}[-] {W}No endpoints discovered during crawl")
-                for ep_base, data in endpoints.items():
-                    params = data["params"]
-                    print(f"{G}[+] {W}Endpoint: {ep_base} -> params: {params}")
-                    examples = data.get("examples", {})
-                    for param in params:
-                        example_url = examples.get(param, ep_base)
-                        print(f"{G}[*] {W}Testing crawled param: {param} -> {example_url}")
-                        test_traversal(local_args, example_url, param, OS_type)
-
-
-    # -------------------------
-    # Open redirect
-    # -------------------------
-    if local_args.open_redirect:
-        if isargsok(local_args, "need_url"):
-            run_openredirect(local_args)
-
-
-    # -------------------------
-    # CRLF
-    # -------------------------
-    if local_args.crlf:
-        if isargsok(local_args, "need_url"):
-            crlf_test(local_args)
-
-
-    # -------------------------
-    # WAF
-    # -------------------------
-    if local_args.waf:
-        if isargsok(local_args, "need_url"):
-            whatwaf(local_args)
-
-
-    # -------------------------
-    # FAVICON
-    # -------------------------
-    if local_args.favicon:
-        if isargsok(local_args, "need_url"):
-            whatfavicon(local_args)
-
-
-    # -------------------------
-    # TLD enum
-    # -------------------------
-    if local_args.tld:
-        if isargsok(local_args, "need_url"):
-            tld_main(local_args)
-
-
-    # -------------------------
-    # BASIC AUTH FUZZER (401)
-    # -------------------------
-    if local_args.basicauth:
-        print(f"\n{Y}[!] Basic auth on {C}{local_args.url}")
-        if isargsok(local_args, "need_fuzzer"):
-            fuzz_auth(local_args)
-
-
-    # -------------------------
-    # WORDPRESS FUZZER (login)
-    # -------------------------
-    if local_args.wordpress:
-        print(f"\n{Y}[!] Wordpress fuzzer on {local_args.url}")
-        if isargsok(local_args, "need_fuzzer_wp"):
-            wordpress_fuzz(local_args)
-
-
-    # -------------------------
-    # TCP_SCANNER
-    # -------------------------
-    if local_args.tcp_scan:
-        extracted_domain = extract_domain(local_args.url)
-        print(f"\n{Y}[!] TCP scan on {extracted_domain}{W}")
-        if isargsok(local_args, "need_url"):
-            asyncio.run(services_scanner(local_args, extracted_domain))
-
-
-    # -------------------------
-    # SSH_BRUTEFORCE
-    # -------------------------
-    if local_args.force_ssh:
-        extracted_domain = extract_domain(local_args.url)
-        print(f"\n{Y}[!] SSH bruteforce on {extracted_domain}{W}")
-        if isargsok(local_args, "need_fuzzer"):
-            dossh(local_args, extracted_domain)
-
-
-    # -------------------------
-    # Subdomains
-    # -------------------------
-    found_subdomains  = []
-    if local_args.subdomains:
-        if isargsok(local_args, "need_url"):
-            extracted_domain = extract_strictdomain(local_args.url)
-            sub_results  = get_subdomains(local_args, extracted_domain)
-            found_subdomains = list(sub_results.keys())
-
-
-    # -------------------------
-    # BUCKET DETECTION
-    # -------------------------
-    if local_args.bucket:
-        extracted_domain = extract_domain(local_args.url)
-        print(f"\n{Y}[!] Bucket search on {extracted_domain}{W}")
-        if isargsok(local_args, "need_url"):
-            dobucket(local_args, extracted_domain, extra_words=found_subdomains)
-
-
-    # -------------------------
-    # REFELCTED PARAMETERS
-    # -------------------------
-    if local_args.reflect:
-        print(f"\n{Y}[!] Search reflected values on {local_args.url}{W}")
-        if isargsok(local_args, "need_url"):
-            reflector(local_args)
-
-
-    # -------------------------
-    # SAVE TO .HAR BURP FILE
-    # -------------------------
-    if local_args.save_burp:
-        print(f"\n{Y}[!] {W}Generating the HAR report...")
-        HAR.save()
-        print(f"{G}[+] {W}Report saved to {datetime.now().strftime("%d-%m-%y-%H-%M.har")}")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Automated Bug Hunting and Pentesting Tool")
-    parser.add_argument("-hh", action="store_true", help="Show full help menu")
-    parser.add_argument("-nc", "--no-clean", action="store_true", help="Do not clean the CLI")
-    parser.add_argument("--jwt", help="Check JWT Bearer Token (--jwt JWT_TOKEN)")
-    parser.add_argument("-u", "--url", help="Target URL to scan")
-    parser.add_argument("-f", "--file", help="Targets URL to scan from file")
-    parser.add_argument("--random-headers", action="store_true", help="Use random User-Agent for each requests from the header file (paylaods) instead of default one")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable Verbose mode")
-    parser.add_argument("--proxy", help="Custom proxy (--proxy http://user:pass@host:port)")
-    parser.add_argument("--tor", action="store_true", help="Force use of Tor SOCKSH proxy (127.0.0.1:9050)")
-    parser.add_argument("-t", "--timeout", type=int, default=60, help="Request timeout in seconds (default: 60 and set to 7 for --tcp-scan)")
-    parser.add_argument("--headers", help='Custom headers as JSON string (--headers "Accept=application/json,Authorization=Bearer TOKEN")')
-    parser.add_argument("--cookies", help='Cookies as JSON string (--cookies "session=abc123; token=xyz789")')
-    parser.add_argument("-X", "--method", default="GET", choices=["GET", "POST", "PUT", "DELETE"], help="HTTP method (default: GET)")
-    parser.add_argument("-e", "--extract", type=int, help="Crawl and extract URLs with parameters (--extract 2)")
-    parser.add_argument("-w", "--wayback", action="store_true", help="Extract Wayback Machine URLs")
-    parser.add_argument("--exclude", help="Exclude extensions from --wayback (comma separated, e.g: png,jpg,css,js)")
-    parser.add_argument("--show-all", action="store_true", help="Show all URLs from --wayback (default = only URLs with parameters)")
-    parser.add_argument("--reflect", type=int, help="Crawl the target up to N levels deep and test query parameters for reflection and SQL errors (--reflect 3)")
-    parser.add_argument("--wtf", type=int, help="Deep scan: extract emails, phones, secrets + robots.txt (--wtf 3)")
-    parser.add_argument("--vln", "--vuln", dest="vuln", action="store_true", help="Detect vulnerable versions and associated CVE and exploits")
-    parser.add_argument("--dir", type=int, choices=[1, 2, 3, 4], default=None, help="Directory fuzzing level (1=Low 2=Moderate 3=Medium 4=High)")
-    parser.add_argument("--exp", "--exploit-search", dest="exploit_search", help='Search exploit from technologie and version (--exploit-search "PHP 8.1" or --exploit-search CVE-2026-8838 or --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*)')
-    parser.add_argument("--audit", action="store_true", help="Perform basic checks on missing headers and configurations")
-    parser.add_argument("--sub", "--subdomains", dest="subdomains", action="store_true", help="Detect target subdomains (DNSDumpster, VirusTotal API key needed)")
-    parser.add_argument("--bucket", action="store_true", help="Try to detect AWS S3 buckets and Azure Blob containers based on the domain name. Use --subdomains to add more specific wordlist to this enumeration")
-    parser.add_argument("--tld", action="store_true", help="Detect new dns extension target (target.to becoming target.cz for exemple")
-    parser.add_argument("--trav", "--traversal", dest="traversal", action="store_true", help="Try path traversal on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
-    parser.add_argument("--ord", "--open-redirect", dest="open_redirect", action="store_true", help="Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)")
-    parser.add_argument("--crlf", action="store_true", help="Try to detect crlf injections")
-    parser.add_argument("--waf", action="store_true", help="Try to detect WAF application")
-    parser.add_argument("--favicon", action="store_true", help="Try to detect favicon hash")
-    parser.add_argument("--tcp-scan", action="store_true", help="TCP scanner compatible with --proxy and --tor. 100 defaults ports scanned if you don't provide --ports. Use --verbose to see filtered and closed ports")
-    parser.add_argument("--ssh-info", action="store_true", help="SSH authentications analysis")
-    parser.add_argument("-p", "--port", help="Ports to scan (--port 22,80,443 or --port 1-150) or a list of ports (--port @ports_filepath) or port to connect for --force-ssh (default: 22)")
-    parser.add_argument("-c", "--concurrency", default=None, type=int, help="Setup concurrency for TCP scan (default: 150) or --force-ssh (default: 1)")
-    parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
-    parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires --url (target), -U/--user and -P/--password")
-    parser.add_argument("--force-ssh", action="store_true", help="Attempt SSH authentication bruteforce. Requires --url (target), -U/--user and -P/--password")
-    parser.add_argument("-wp", "--wordpress", action="store_true", help="Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.")
-    parser.add_argument("-U", "--user", help="username or @usernames_filepath")
-    parser.add_argument("-P", "--password", help="password or @passwords_filepath")
-    parser.add_argument("--batch", action="store_true", help="Never ask for user input, use the default behavior")
-    parser.add_argument("--save", action="store_true", help="Save the results as a structured JSON file")
-    parser.add_argument("--save-burp", action="store_true", help="Save HTTP requests to HAR file for Burp Suite")
-    parser.add_argument("--commits", help="Found related emails from Github commits (--commits <GITHUB_USERNAME>)")
-    
-    args = parser.parse_args()
-    
-    
-    # -------------------------
-    # Forms & params
-    # -------------------------
-    if len(sys.argv) == 1:
-        clear_screen()
-        print_banner()
-        parser.print_usage()
-        sys.exit()
-
-    no_clean(args)
-    print(f"{Y}[!] {C}Command: {G}{' '.join(sys.argv)}")
-
-    init_env_file(args)
-
-    # -------------------------
-    # Full help menu
-    # -------------------------
-    if args.hh:
-        print(help_menu)
-        exit(0)
-
-    # -------------------------
-    # Tor check
-    # -------------------------
-    if args.tor:
-       ensure_tor_or_exit()
-
+def save_report(args):
     if args.file:
-        try:
-            with open(args.file, "r", encoding="utf-8") as f:
-                targets = [
-                    ensure_http(line)
-                    for line in f
-                    if line.strip()
-                ]
-        except Exception as e:
-            print(f"{R}[-] Cannot read file: {e}")
-            sys.exit(1)
+        filename = "scan-report.json"
 
-        # -------------------------
-        # Sequential mode
-        # -------------------------
-        for target in targets:
-            if not target.startswith(("http://", "https://")):
-                print(f"{R}[-] Invalid URL: {target}")
-                continue
+    elif args.url:
+        url = normalize_url(args.url)
+        domain = urlparse(url).hostname or "output"
+        filename = f"{domain}.json"
 
-            try:
-                if args.save:
-                    if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                        init_report(args, target)
-
-                process_target(args, target)
-
-            except KeyboardInterrupt:
-                raise
-
-            except Exception as e:
-                print(f"{R}[-] Error with {target}: {e}")
-
-        # -------------------------
-        # Save Output (end)
-        # -------------------------
-        if args.save:
-            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                print(f"\n{Y}[!] {W}Generating the JSON report...")
-                filename = save_report(args)
-                print(f"{G}[+] {W}Report saved to {filename}")
-
-        print(f"\n{Y}[!] {W}End of multi-target scan")
+    elif args.commits:
+        filename = f"{args.commits}.json"
 
     else:
+        filename = "scan-report.json"
 
-        # -------------------------
-        # Save Output (init)
-        # -------------------------
-        if args.save:
-            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                init_report(args, args.url)
+    data = {
+        "targets": REPORTS
+    }
 
-        # -------------------------
-        # Single mode
-        # -------------------------
-        if args.url:
-            process_target(args, ensure_http(args.url))
-        else:
-            process_target(args, None)
-    
-        # -------------------------
-        # Save Output (end)
-        # -------------------------
-        if args.save:
-            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                print(f"\n{Y}[!] {W}Generating the JSON report...")
-                filename = save_report(args)
-                print(f"{G}[+] {W}Report saved to {filename}")
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(
+            data,
+            f,
+            indent=4,
+            ensure_ascii=False
+        )
 
-        print(f"\n{Y}[!] {W}End of search")
+    return filename
 
 
-if __name__ == "__main__":
-    main()
+
+class HARRecorder:
+    def __init__(self, filename=datetime.now().strftime("%d-%m-%y-%H-%M.har")):
+        self.filename = filename
+        self.entries = []
+
+    def add(self, method, url, headers, body, response):
+        if response is None:
+            return
+
+        try:
+            parsed = urlparse(url)
+            request_headers = [
+                {
+                    "name": k,
+                    "value": v
+                }
+                for k, v in headers.items()
+            ]
+
+            response_headers = [
+                {
+                    "name": k,
+                    "value": v
+                }
+                for k, v in response.headers.items()
+            ]
+
+            entry = {
+                "startedDateTime": datetime.utcnow().isoformat() + "Z",
+                "time": 0,
+
+                "request": {
+                    "method": method,
+                    "url": url,
+                    "httpVersion": "HTTP/1.1",
+                    "headers": request_headers,
+                    "queryString": [],
+                    "cookies": [],
+                    "headersSize": -1,
+                    "bodySize": len(body or "")
+                },
+
+                "response": {
+                    "status": response.status_code,
+                    "statusText": "",
+                    "httpVersion": "HTTP/1.1",
+                    "redirectURL": response.headers.get("Location", ""),
+                    "headers": response_headers,
+                    "cookies": [],
+                    "content": {
+                        "size": len(response.text),
+                        "mimeType": response.headers.get(
+                            "Content-Type",
+                            ""
+                        ),
+                        "text": response.text
+                    }
+                },
+
+                "cache": {},
+                "timings": {
+                    "send": 0,
+                    "wait": 0,
+                    "receive": 0
+                }
+            }
+            self.entries.append(entry)
+        except Exception:
+            pass
+
+    def save(self):
+        data = {
+            "log": {
+                "version": "1.2",
+                "creator": {
+                    "name": "ThiefHunter",
+                    "version": "2.0"
+                },
+                "entries": self.entries
+            }
+        }
+        Path(self.filename).write_text(
+            json.dumps(data, indent=4),
+            encoding="utf-8"
+        )
