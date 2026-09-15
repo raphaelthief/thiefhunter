@@ -16,7 +16,7 @@ def init_report(args: str):
             args.url = f"https://{args.url}"
         REPORT["target"] = args.url
     else:
-        REPORT["target"] = args.commit
+        REPORT["target"] = args.commits
 
 def add_result(module, result):
     REPORT["modules"].setdefault(module, [])
@@ -34,7 +34,7 @@ def save_report(args):
             url = normalize_url(args.url)
             domain = urlparse(url).hostname or "output"
             return f"{domain}.json"
-        return f"{args.commit}.json"
+        return f"{args.commits}.json"
 
     if getattr(args, "save", None):
         if args.save is True:
