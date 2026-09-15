@@ -140,22 +140,6 @@ def process_target(args, target_url):
     # -------------------------
     if local_args.wtf:
         if isargsok(local_args, "need_url"):
-            def fmt(item):
-                """
-                Normalizes scan outputs for printing.
-                Works with:
-                - dicts: {"value", "page", "line"}
-                - strings
-                """
-                if isinstance(item, dict):
-                    value = item.get("value", "")
-                    page = item.get("page")
-                    line = item.get("line")
-                    if page is not None and line is not None:
-                        return f"{value} ({page}:{line})"
-                    return str(value)
-                return str(item)
-            
             print(f"{C}[!] {G}Running WTF scan (depth={local_args.wtf})")
             data = wtf_scan(local_args.url, local_args, max_depth=local_args.wtf)
             print()
@@ -691,27 +675,24 @@ def main():
             print(f"{R}[-] Cannot read file: {e}")
             sys.exit(1)
 
-
-        # -------------------------
-        # Save Output (init)
-        # -------------------------
-        if args.save:
-            if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                init_report(args)
-
         # -------------------------
         # Sequential mode
         # -------------------------
         for target in targets:
             if not target.startswith(("http://", "https://")):
-                print(f"{R}[-] Invalid URL: {target}") # no need now but still there
+                print(f"{R}[-] Invalid URL: {target}")
                 continue
 
             try:
+                if args.save:
+                    if isargsok(args, "need_url") or isargsok(args, "need_commit"):
+                        init_report(args, target)
+
                 process_target(args, target)
+
             except KeyboardInterrupt:
                 raise
-                
+
             except Exception as e:
                 print(f"{R}[-] Error with {target}: {e}")
 
@@ -733,7 +714,7 @@ def main():
         # -------------------------
         if args.save:
             if isargsok(args, "need_url") or isargsok(args, "need_commit"):
-                init_report(args)
+                init_report(args, args.url)
 
         # -------------------------
         # Single mode
