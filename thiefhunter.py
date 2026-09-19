@@ -596,6 +596,7 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable Verbose mode")
     parser.add_argument("--proxy", help="Custom proxy (--proxy http://user:pass@host:port)")
     parser.add_argument("--tor", action="store_true", help="Force use of Tor SOCKSH proxy (127.0.0.1:9050)")
+    parser.add_argument("--notor-api", action="store_true", help="Diable Tor for API requests (virustotal, crt.sh, etc...)")
     parser.add_argument("-t", "--timeout", type=int, default=60, help="Request timeout in seconds (default: 60 and set to 7 for --tcp-scan)")
     parser.add_argument("--headers", help='Custom headers as JSON string (--headers "Accept=application/json,Authorization=Bearer TOKEN")')
     parser.add_argument("--cookies", help='Cookies as JSON string (--cookies "session=abc123; token=xyz789")')
