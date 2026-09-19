@@ -148,10 +148,11 @@ def get_request(args, url, **kwargs):
 
     # --- PROXY LOGIC ---
     proxies = None
-
-    if args.tor:
+    
+    notor = kwargs.get("notor", False)
+    if args.tor and not notor:
         proxies = SOCKS_PROXY
-
+    
     elif args.proxy:
         active_proxy = args.proxy.strip().rstrip("/")
         if active_proxy.lower() == "socks":
@@ -162,7 +163,7 @@ def get_request(args, url, **kwargs):
                 "http": active_proxy,
                 "https": active_proxy
             }
-
+            
     # --- METHOD ---
     #method = getattr(args, "method", "GET").upper()
     method = kwargs.get("method", getattr(args, "method", "GET")).upper()
