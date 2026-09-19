@@ -175,8 +175,13 @@ def fetch_crtsh(args, domain: str, retries: int = 10): # 10 retry for crt.sh
         try:
             if args.verbose:
                 print(f"{Y}[INFO] {W}Attempt {attempt + 1}/{retries} for crt.sh")
+            
+            if args.notor_api:
+                response = get_request(args, url, timeout=60, notor=True)
+            else:
+                response = get_request(args, url, timeout=60)                
 
-            response = get_request(args, url, timeout=60)
+            
             
             # retry error code 502
             if response.status_code == 502:
@@ -256,8 +261,12 @@ def get_subdomains(args, domain: str) -> dict:
                 "X-API-Key": API_KEY,
                 "Accept": "application/json"
             }
-
-            response = get_request(args, url, headers=headers, timeout=30)
+            
+            if args.notor_api:
+                response = get_request(args, url, headers=headers, timeout=30, notor= True)
+            else:    
+                response = get_request(args, url, headers=headers, timeout=30)
+                
             response.raise_for_status()
             data = response.json()
             for record in data.get("a", []):
@@ -332,8 +341,12 @@ def get_subdomains(args, domain: str) -> dict:
                 "apikey": VT_API_KEY,
                 "domain": domain
             }
-
-            response = get_request(args, vt_url, params=params, timeout=30)
+            
+            if args.notor_api:
+                response = get_request(args, vt_url, params=params, timeout=30, notor=True)
+            else:    
+                response = get_request(args, vt_url, params=params, timeout=30)
+                
             data = response.json()
             for sub in data.get("subdomains", []):
                 if sub not in results:
