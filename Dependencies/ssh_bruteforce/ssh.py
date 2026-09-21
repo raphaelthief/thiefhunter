@@ -14,16 +14,20 @@ def log(msg):
 
 
 def parse_value(value):
-    if value.startswith("@"):
-        path = value[1:]
+    if not value.startswith("@"):
+        return [value]
+        
+    path = value[1:]
+    encodings = ("utf-8-sig", "cp1252", "iso-8859-1")
+    for encoding in encodings:
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding=encoding) as f:
                 return [line.strip() for line in f if line.strip()]
-
+        except UnicodeDecodeError:
+            continue
         except FileNotFoundError:
             raise SystemExit(f"[!] File not found: {path}")
-
-    return [value]
+    raise SystemExit(f"[!] Unable to decode file: {path}. Supported encodings: {', '.join(encodings)}")
 
 
 def create_proxy_socket(args):
