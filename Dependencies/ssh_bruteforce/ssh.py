@@ -115,7 +115,7 @@ def ssh_test(args, extracted_domain, username, password, state):
         
         print(f"{G}[+] SSH success: {C}{username}:{password}{W}")
         stdin, stdout, stderr = client.exec_command("whoami")
-        print(stdout.read().decode().strip())
+        print(f"{G}[+] whoami: {R}" + stdout.read().decode().strip())
         return True
 
     except paramiko.AuthenticationException as e:
