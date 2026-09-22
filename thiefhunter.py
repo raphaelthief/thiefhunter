@@ -31,6 +31,7 @@ from Dependencies.auth_401.basic_auth import fuzz_auth
 from Dependencies.Wordpress_auth.automated_wordpress_bruteforce import wordpress_fuzz
 from Dependencies.port_scanner_TCP.tcp_scan import services_scanner
 from Dependencies.ssh_bruteforce.ssh import dossh
+from Dependencies.smb_bruteforce.smb import dosmb
 from Dependencies.bucket_detection.detect_bucket import dobucket
 from Dependencies.get_request import HAR
 from Dependencies.CrawlURLS.refelcted_injections import reflector
@@ -543,7 +544,29 @@ def process_target(args, target_url):
         extracted_domain = extract_domain(local_args.url)
         print(f"\n{Y}[!] SSH bruteforce on {extracted_domain}{W}")
         if isargsok(local_args, "need_fuzzer"):
+            if local_args.concurrency is None:
+                local_args.concurrency = 1
+                
+            if local_args.port is None:
+                local_args.port = 22
+            
             dossh(local_args, extracted_domain)
+
+
+    # -------------------------
+    # SMB_BRUTEFORCE
+    # -------------------------
+    if local_args.force_smb:
+        extracted_domain = extract_domain(local_args.url)
+        print(f"\n{Y}[!] SMB bruteforce on {extracted_domain}{W}")
+        if isargsok(local_args, "need_url"):
+            if local_args.concurrency is None:
+                local_args.concurrency = 1
+                
+            if local_args.port is None:
+                local_args.port = 445
+                
+            dosmb(local_args, extracted_domain)
 
 
     # -------------------------
@@ -622,10 +645,11 @@ def main():
     parser.add_argument("--tcp-scan", action="store_true", help="TCP scanner compatible with --proxy and --tor. 100 defaults ports scanned if you don't provide --ports. Use --verbose to see filtered and closed ports")
     parser.add_argument("--ssh-info", action="store_true", help="SSH authentications analysis")
     parser.add_argument("-p", "--port", help="Ports to scan (--port 22,80,443 or --port 1-150) or a list of ports (--port @ports_filepath) or port to connect for --force-ssh (default: 22)")
-    parser.add_argument("-c", "--concurrency", default=None, type=int, help="Setup concurrency for TCP scan (default: 150) or --force-ssh (default: 1)")
+    parser.add_argument("-c", "--concurrency", default=None, type=int, help="Setup concurrency for TCP scan (default: 150), --force-ssh (default: 1), --force-smb (default: 1)")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires --url (target), -U/--user and -P/--password")
     parser.add_argument("--force-ssh", action="store_true", help="Attempt SSH authentication bruteforce. Requires --url (target), -U/--user and -P/--password")
+    parser.add_argument("--force-smb", action="store_true", help="Attempt SMB authentication bruteforce. Requires --url (target), -U/--user and -P/--password. For anonymous loggin do not provide --username and --password")
     parser.add_argument("-wp", "--wordpress", action="store_true", help="Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.")
     parser.add_argument("-U", "--user", help="username or @usernames_filepath")
     parser.add_argument("-P", "--password", help="password or @passwords_filepath")
