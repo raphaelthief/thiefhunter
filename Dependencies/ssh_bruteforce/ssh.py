@@ -34,7 +34,7 @@ def create_proxy_socket(args):
     if args.tor:
         # log("[+] Using Tor SOCKS5 proxy 127.0.0.1:9050")
         sock = socks.socksocket()
-        sock.set_proxy(proxy_type=socks.SOCKS5, addr="127.0.0.1", port=9050)
+        sock.set_proxy(proxy_type=socks.SOCKS5, addr="127.0.0.1", port=9050, rdns=True)
         sock.settimeout(args.timeout)
         return sock
 
