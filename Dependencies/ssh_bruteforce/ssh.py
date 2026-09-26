@@ -75,7 +75,7 @@ def ssh_test(args, extracted_domain, username, password, state):
         time.sleep(wait_time)
 
     if args.port:
-        port = args.port
+        port = int(args.port)
     
     if args.verbose:
         log(f"{W}[*] {username}:{password}")
