@@ -644,7 +644,7 @@ def main():
     parser.add_argument("--favicon", action="store_true", help="Try to detect favicon hash")
     parser.add_argument("--tcp-scan", action="store_true", help="TCP scanner compatible with --proxy and --tor. 100 defaults ports scanned if you don't provide --ports. Use --verbose to see filtered and closed ports")
     parser.add_argument("--ssh-info", action="store_true", help="SSH authentications analysis")
-    parser.add_argument("-p", "--port", help="Ports to scan (--port 22,80,443 or --port 1-150) or a list of ports (--port @ports_filepath) or port to connect for --force-ssh (default: 22)")
+    parser.add_argument("-p", "--port", default=None, type=int, help="Ports to scan (--port 22,80,443 or --port 1-150) or a list of ports (--port @ports_filepath) or port to connect for --force-ssh (default: 22)")
     parser.add_argument("-c", "--concurrency", default=None, type=int, help="Setup concurrency for TCP scan (default: 150), --force-ssh (default: 1), --force-smb (default: 1)")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires --url (target), -U/--user and -P/--password")
