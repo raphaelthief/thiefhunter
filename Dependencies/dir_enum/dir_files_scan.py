@@ -482,7 +482,8 @@ def do_fuzz_paths(args):
         worker(args, base_url, f"wp-json/oembed/1.0/embed?url={base_url}", baseline)
 
         # 5. Execute Thread Pool
-        with ThreadPoolExecutor(max_workers=25) as executor:
+        workers = args.concurrency if args.concurrency else 25
+        with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = [executor.submit(worker, args, base_url, path, baseline, path_templates.get(path)) for path in paths]
             for future in tqdm(
                 as_completed(futures),
