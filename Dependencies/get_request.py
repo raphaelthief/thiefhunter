@@ -1,4 +1,4 @@
-import requests, random, socket, ssl, socks, threading
+import requests, random, socket, ssl, socks, threading, time
 from pathlib import Path
 from urllib.parse import urlparse
 from tqdm import tqdm
@@ -169,6 +169,9 @@ def get_request(args, url, **kwargs):
     method = kwargs.get("method", getattr(args, "method", "GET")).upper()
     
     # --- REQUEST ---
+    if args.delay:
+        time.sleep(args.delay)
+
     try:
         response = requests.request(
             method=method,
@@ -188,7 +191,7 @@ def get_request(args, url, **kwargs):
 
         if getattr(args, "save_burp", False):
             HAR.add(method, url, final_headers, kwargs.get("data"), response)
-
+            
         return response
     except requests.exceptions.ConnectionError as e:
         global _connection_abort_count, _connection_warning_shown
