@@ -1264,6 +1264,62 @@ FTP AUTH FUZZING
           latency measurements and FTP error analysis
 
 
+VNC AUTH FUZZING
+───────────────────────────────────────────────────────────────────────
+--force-vnc
+Fuzz VNC authentication credentials
+
+  Features:
+      - username/password wordlist support
+      - single credential testing
+      - SOCKS4/SOCKS5 proxy support
+      - Tor SOCKS5 support (--tor)
+      - configurable concurrency (--concurrency)
+      - adaptive delay on connection errors
+      - VNC security type detection
+      - VNC authentication method detection
+      - successful authentication detection
+      - authentication, VNC and network error analysis
+      - latency measurement
+      - progress tracking and statistics
+      - result export with --save
+
+  Usage:
+      Supports direct values or files:
+          --user admin
+          --password password
+
+      or wordlists:
+          --user @users.txt
+          --password @passwords.txt
+
+  Options:
+      --port 5900
+      --proxy socks5://127.0.0.1:1080
+      --tor
+      --concurrency 5
+
+  Detection:
+      Identifies:
+          - VNC security types
+          - VNC Authentication
+          - Tight security negotiation
+          - VeNCrypt security negotiation
+          - TLS-based VNC authentication
+          - username/password authentication requirements
+          - valid VNC credentials
+          - authentication failures
+          - unsupported security types
+          - VNC protocol errors
+          - connection resets/timeouts
+          - possible rate limiting or temporary blocking
+
+  Recommendation:
+      Use with --verbose for detailed security negotiation,
+      authentication attempts, latency measurements
+      and VNC error analysis
+
+
 WORDPRESS FUZZING
 ───────────────────────────────────────────────────────────────────────
  --wordpress
