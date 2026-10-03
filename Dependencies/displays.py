@@ -167,6 +167,33 @@ GENERAL OPTIONS
       Default:
           GET
 
+  {C}--delay SECONDS{G}
+      Delay in seconds between each request
+
+      Useful for:
+          - controlling request rate
+          - reducing request frequency
+          - testing rate-limiting behavior
+          - pacing automated requests
+
+      Example:
+          --delay 2
+
+  {C}--concurrency NUMBER{G}
+      Number of concurrent requests
+
+      Useful for:
+          - controlling parallel request execution
+          - adjusting request throughput
+          - testing concurrency handling
+          - tuning performance
+
+      Default:
+          1 (depend on what functions. (eg: 25 for --dir)
+
+      Example:
+          --concurrency 5
+
 
 {Y}JWT ANALYSIS
 ───────────────────────────────────────────────────────────────────────{G}
@@ -477,7 +504,7 @@ GENERAL OPTIONS
 
       Performance:
           Configure concurrency:
-              {C}--concurrency 300
+              --concurrency 25
 
           Default:
               150 simultaneous TCP connections
@@ -732,6 +759,98 @@ GENERAL OPTIONS
       Recommendation:
           Use with --verbose for detailed authentication attempts
           latency measurements and SSH error analysis
+
+
+{Y}SMB AUTH FUZZING
+───────────────────────────────────────────────────────────────────────{G}
+ {C}--force-smb{G}
+      Fuzz SMB authentication credentials
+
+      Features:
+          - username/password wordlist support
+          - single credential testing
+          - SOCKS4/SOCKS5 proxy support
+          - Tor SOCKS5 support (--tor)
+          - configurable concurrency (--concurrency)
+          - adaptive delay on connection errors
+          - successful credential detection
+          - authentication, SMB and network error analysis
+          - latency measurement
+          - progress tracking and statistics
+          - result export with --save
+
+      Usage:
+          Supports direct values or files:
+              --user admin
+              --password password
+
+          or wordlists:
+              --user @users.txt
+              --password @passwords.txt
+
+      Options:
+          --port 445
+          --proxy socks5://127.0.0.1:1080
+          --tor
+          --concurrency 5
+
+      Detection:
+          Identifies:
+              - valid SMB credentials
+              - authentication failures
+              - SMB protocol errors
+              - connection resets/timeouts
+              - possible rate limiting or temporary blocking
+
+      Recommendation:
+          Use with --verbose for detailed authentication attempts
+          latency measurements and SMB error analysis
+
+
+{Y}FTP AUTH FUZZING
+───────────────────────────────────────────────────────────────────────{G}
+ {C}--force-ftp{G}
+      Fuzz FTP authentication credentials
+
+      Features:
+          - username/password wordlist support
+          - single credential testing
+          - SOCKS4/SOCKS5 proxy support
+          - Tor SOCKS5 support (--tor)
+          - configurable concurrency (--concurrency)
+          - adaptive delay on connection errors
+          - successful credential detection
+          - authentication, FTP and network error analysis
+          - latency measurement
+          - progress tracking and statistics
+          - result export with --save
+
+      Usage:
+          Supports direct values or files:
+              --user admin
+              --password password
+
+          or wordlists:
+              --user @users.txt
+              --password @passwords.txt
+
+      Options:
+          --port 21
+          --proxy socks5://127.0.0.1:1080
+          --tor
+          --concurrency 5
+
+      Detection:
+          Identifies:
+              - valid FTP credentials
+              - authentication failures
+              - FTP protocol errors
+              - connection resets/timeouts
+              - possible rate limiting or temporary blocking
+
+      Recommendation:
+          Use with --verbose for detailed authentication attempts
+          latency measurements and FTP error analysis
 
 
 {Y}WORDPRESS FUZZING
