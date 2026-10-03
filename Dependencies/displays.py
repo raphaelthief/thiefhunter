@@ -86,6 +86,14 @@ GENERAL OPTIONS
           - If Tor runs on another port, edit:
                 Dependencies/get_request.py
 
+  {C}--notor-api{G}
+      Disable Tor for API requests
+
+      Applies to:
+          - VirusTotal
+          - crt.sh
+          - other external API requests (does not interfer directly with the target)
+
 
 {Y}SAVE OPTIONS
 ───────────────────────────────────────────────────────────────────────{G}
