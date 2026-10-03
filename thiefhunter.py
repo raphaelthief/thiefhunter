@@ -33,6 +33,7 @@ from Dependencies.port_scanner_TCP.tcp_scan import services_scanner
 from Dependencies.ssh_bruteforce.ssh import dossh
 from Dependencies.smb_bruteforce.smb import dosmb
 from Dependencies.ftp_bruteforce.ftp import doftp
+from Dependencies.vnc_bruteforce.vnc import dovnc
 from Dependencies.bucket_detection.detect_bucket import dobucket
 from Dependencies.get_request import HAR
 from Dependencies.CrawlURLS.refelcted_injections import reflector
@@ -547,10 +548,10 @@ def process_target(args, target_url):
         if isargsok(local_args, "need_fuzzer"):
             if local_args.concurrency is None:
                 local_args.concurrency = 1
-                
+
             if local_args.port is None:
                 local_args.port = 22
-            
+
             dossh(local_args, extracted_domain)
 
 
@@ -563,10 +564,10 @@ def process_target(args, target_url):
         if isargsok(local_args, "need_url"):
             if local_args.concurrency is None:
                 local_args.concurrency = 1
-                
+
             if local_args.port is None:
                 local_args.port = 445
-                
+
             dosmb(local_args, extracted_domain)
 
 
@@ -579,11 +580,27 @@ def process_target(args, target_url):
         if isargsok(local_args, "need_url"):
             if local_args.concurrency is None:
                 local_args.concurrency = 1
-                
+
             if local_args.port is None:
                 local_args.port = 21
-                
+
             doftp(local_args, extracted_domain)
+
+
+    # -------------------------
+    # VNC_BRUTEFORCE
+    # -------------------------
+    if local_args.force_vnc:
+        extracted_domain = extract_domain(local_args.url)
+        print(f"\n{Y}[!] VNC bruteforce on {extracted_domain}{W}")
+        if isargsok(local_args, "need_url"):
+            if local_args.concurrency is None:
+                local_args.concurrency = 1
+
+            if local_args.port is None:
+                local_args.port = 5900
+
+            dovnc(local_args, extracted_domain)
 
 
     # -------------------------
@@ -669,6 +686,7 @@ def main():
     parser.add_argument("--force-ssh", action="store_true", help="Attempt SSH authentication bruteforce. Requires --url (target), -U/--user and -P/--password")
     parser.add_argument("--force-smb", action="store_true", help="Attempt SMB authentication bruteforce. Requires --url (target), -U/--user and -P/--password. For anonymous loggin do not provide --username and --password")
     parser.add_argument("--force-ftp", action="store_true", help="Attempt FTP authentication bruteforce. Requires --url (target), -U/--user and -P/--password. For anonymous loggin do not provide --username and --password")
+    parser.add_argument("--force-vnc", action="store_true", help="Attempt VNC authentication bruteforce. Requires --url (target), -U/--user and -P/--password. To get Security types do not provide --username and --password and use --verbose")
     parser.add_argument("-wp", "--wordpress", action="store_true", help="Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.")
     parser.add_argument("-U", "--user", "--username", help="username or @usernames_filepath")
     parser.add_argument("-P", "--password", help="password or @passwords_filepath")
