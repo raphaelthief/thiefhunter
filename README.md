@@ -4,13 +4,21 @@ ThiefHunter is an offensive security framework designed for real-world reconnais
 Built for pentesters, bug bounty hunters and auditors, it focuses on high signal enumeration, low-noise OPSEC, and context-aware attack automation.
 The tool focusses on adaptive offensive automation with practical OPSEC awareness.
 
-![Main menu](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Main.png "Main menu")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Main.png" alt="Status menu">
+</div>
 
 To see the account menu and the features related to the ```-hh``` menu, scroll to the end of this description.
 
 ## Main features
 ```
-usage: thiefhunter.py [-h] [-hh] [-nc] [--jwt JWT] [-u URL] [-f FILE] [--random-headers] [-v] [--proxy PROXY] [--tor] [-t TIMEOUT] [--headers HEADERS] [--cookies COOKIES] [-X {GET,POST,PUT,DELETE}] [-e EXTRACT] [-w] [--exclude EXCLUDE] [--show-all] [--reflect REFLECT] [--wtf WTF] [--vln] [--dir {1,2,3,4}] [--exp EXPLOIT_SEARCH] [--audit] [--sub] [--bucket] [--tld] [--trav] [--ord] [--crlf] [--waf] [--favicon] [--tcp-scan] [--ssh-info] [-p PORT] [-c CONCURRENCY] [--bypass-403] [--basicauth] [--force-ssh] [-wp] [-U USER] [-P PASSWORD] [--batch] [--save] [--save-burp] [--commits COMMITS]
+usage: thiefhunter.py [-h] [-hh] [-nc] [--jwt JWT] [-u URL] [-f FILE] [--random-headers] [-v] [--proxy PROXY] [--tor]
+                      [--notor-api] [-t TIMEOUT] [--delay DELAY] [--headers HEADERS] [--cookies COOKIES]
+                      [-X {GET,POST,PUT,DELETE}] [-e EXTRACT] [-w] [--exclude EXCLUDE] [--show-all] [--reflect REFLECT]
+                      [--wtf WTF] [--vln] [--dir {1,2,3,4}] [--exp EXPLOIT_SEARCH] [--audit] [--sub] [--bucket] [--tld]
+                      [--trav] [--ord] [--crlf] [--waf] [--favicon] [--tcp-scan] [--ssh-info] [-p PORT] [-c CONCURRENCY]
+                      [--bypass-403] [--basicauth] [--force-ssh] [--force-smb] [--force-ftp] [-wp] [-U USER] [-P PASSWORD]
+                      [--batch] [--save] [--save-burp] [--commits COMMITS]
 
 Automated Bug Hunting and Pentesting Tool
 
@@ -25,8 +33,10 @@ options:
   -v, --verbose         Enable Verbose mode
   --proxy PROXY         Custom proxy (--proxy http://user:pass@host:port)
   --tor                 Force use of Tor SOCKSH proxy (127.0.0.1:9050)
+  --notor-api           Diable Tor for API requests (virustotal, crt.sh, etc...)
   -t, --timeout TIMEOUT
                         Request timeout in seconds (default: 60 and set to 7 for --tcp-scan)
+  --delay DELAY         Delay in seconds between each request
   --headers HEADERS     Custom headers as JSON string (--headers "Accept=application/json,Authorization=Bearer TOKEN")
   --cookies COOKIES     Cookies as JSON string (--cookies "session=abc123; token=xyz789")
   -X, --method {GET,POST,PUT,DELETE}
@@ -41,27 +51,39 @@ options:
   --vln, --vuln         Detect vulnerable versions and associated CVE and exploits
   --dir {1,2,3,4}       Directory fuzzing level (1=Low 2=Moderate 3=Medium 4=High)
   --exp, --exploit-search EXPLOIT_SEARCH
-                        Search exploit from technologie and version (--exploit-search "PHP 8.1" or --exploit-search CVE-2026-8838 or --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*)
+                        Search exploit from technologie and version (--exploit-search "PHP 8.1" or --exploit-search CVE-2026-8838 or
+                        --exploit-search cpe:2.3:a:sudo_project:sudo:1.8.2:*:*:*:*:*:*:*)
   --audit               Perform basic checks on missing headers and configurations
   --sub, --subdomains   Detect target subdomains (DNSDumpster, VirusTotal API key needed)
-  --bucket              Try to detect AWS S3 buckets and Azure Blob containers based on the domain name. Use --subdomains to add more specific wordlist to this enumeration
+  --bucket              Try to detect AWS S3 buckets and Azure Blob containers based on the domain name. Use --subdomains to add more
+                        specific wordlist to this enumeration
   --tld                 Detect new dns extension target (target.to becoming target.cz for exemple
-  --trav, --traversal   Try path traversal on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)
+  --trav, --traversal   Try path traversal on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set
+                        to 2)
   --ord, --open-redirect
-                        Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set to 2)
+                        Try open redirect on specific endpoint (https://site.com/?endpoint=exemple) or find one by auto crawling (depth set
+                        to 2)
   --crlf                Try to detect crlf injections
   --waf                 Try to detect WAF application
   --favicon             Try to detect favicon hash
-  --tcp-scan            TCP scanner compatible with --proxy and --tor. 100 defaults ports scanned if you don't provide --ports. Use --verbose to see filtered and closed ports
+  --tcp-scan            TCP scanner compatible with --proxy and --tor. 100 defaults ports scanned if you don't provide --ports. Use --verbose
+                        to see filtered and closed ports
   --ssh-info            SSH authentications analysis
-  -p, --port PORT       Ports to scan (--port 22,80,443 or --port 1-150) or a list of ports (--port @ports_filepath) or port to connect for --force-ssh (default: 22)
+  -p, --port PORT       Ports to scan (--port 22,80,443 or --port 1-150) or a list of ports (--port @ports_filepath) or port to connect for
+                        --force-ssh (default: 22)
   -c, --concurrency CONCURRENCY
-                        Setup concurrency for TCP scan (default: 150) or --force-ssh (default: 1)
+                        Setup concurrency for TCP scan (default: 150), --force-ssh (default: 1), --force-smb (default: 1)
   --bypass-403          Attempt 403 bypass techniques
   --basicauth           Attempt HTTP Basic Authentication. Requires --url (target), -U/--user and -P/--password
   --force-ssh           Attempt SSH authentication bruteforce. Requires --url (target), -U/--user and -P/--password
-  -wp, --wordpress      Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.
-  -U, --user USER       username or @usernames_filepath
+  --force-smb           Attempt SMB authentication bruteforce. Requires --url (target), -U/--user and -P/--password. For anonymous loggin do
+                        not provide --username and --password
+  --force-ftp           Attempt FTP authentication bruteforce. Requires --url (target), -U/--user and -P/--password. For anonymous loggin do
+                        not provide --username and --password
+  -wp, --wordpress      Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively,
+                        use -U/--user to brute-force a specific username or a list of usernames.
+  -U, --user, --username USER
+                        username or @usernames_filepath
   -P, --password PASSWORD
                         password or @passwords_filepath
   --batch               Never ask for user input, use the default behavior
@@ -102,6 +124,44 @@ GITHUB_API_KEY=
   
   -> Used for enumerating GitHub profiles to discover emails used in commits ```--commits```
 
+
+### OPSEC & Tor-Oriented Networking
+A strong focus was placed on operational security and DNS leak prevention.
+The framework prioritizes:
+```
+SOCKS_PROXY = {
+    "http": "socks5h://127.0.0.1:9050",
+    "https": "socks5h://127.0.0.1:9050",
+}
+```
+
+```
+sock = socks.socksocket()
+sock.set_proxy(
+    socks.SOCKS5,
+    "127.0.0.1",
+    9050,
+    rdns=True
+)
+```
+
+Using socks5h ensures:
+- remote DNS resolution
+- reduced DNS leak risks
+- improved anonymity consistency
+- Native Tor Validation
+
+The ```--tor``` option includes:
+- automatic Tor routing
+- SOCKS5 proxy enforcement
+- DNS-through-proxy resolution
+- Tor usage verification through TorProject APIs
+
+The framework attempts to prevent common OPSEC mistakes frequently overlooked in offensive tooling.
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/opsec_demo.png" alt="Tor proxy opsec demo">
+</div>
 
 
 ## HAR BURP SETUP
@@ -171,7 +231,9 @@ This hybrid approach significantly improves:
 - version accuracy
 - hidden technology discovery
 
-![Version detection](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/vuln_function_versions_detection.png "Version detection")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/vuln_function_versions_detection.png" alt="Version detection">
+</div>
 
 
 ### Intelligent CVE & Exploit Correlation
@@ -183,7 +245,9 @@ After technology enumeration, ThiefHunter uses the Search-Vulns project to:
 
 Instead of dumping generic CVEs, the framework attempts to identify the most relevant attack surface based on detected versions and technologies.
 
-![CVE and EXPLOITS detection](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/vuln_function_CVE_detection.png "CVE and EXPLOITS detection")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/vuln_function_CVE_detection.png" alt="CVE and EXPLOITS detection">
+</div>
 
 
 ============================================================================================
@@ -226,11 +290,17 @@ The engine automatically adapts based on:
 
 instead of blindly replaying static payload lists.
 
-![Traversal detection](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/traversal_detection.png "Traversal detection")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/traversal_detection.png" alt="Traversal detection">
+</div>
 
-![Adaptive enum](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Traversal_valid_enum.png "Adaptive enum")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Traversal_valid_enum.png" alt="Adaptive enum">
+</div>
 
-![Traversal display](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Traversal_result_display.png "Traversal display")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/Traversal_result_display.png" alt="Traversal display">
+</div>
 
 
 ### Subdomain Enumeration Engine
@@ -297,49 +367,21 @@ Supported algorithms:
 - ES256 / ES384 / ES512
 - EdDSA
 
-![JWT displayer](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_display.png "JWT displayer")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_display.png" alt="JWT displayer">
+</div>
 
-![JWT sub modification](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_edit_sub.png "JWT sub modification")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_edit_sub.png" alt="JWT sub modification">
+</div>
 
-![JWT jwk injection](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_jwk_injection.png "JWT jwk injection")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_jwk_injection.png" alt="JWT jwk injection">
+</div>
 
-![JWT jwk display](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_jwk_injection_output.png "JWT jwk display")
-
-
-
-### OPSEC & Tor-Oriented Networking
-A strong focus was placed on operational security and DNS leak prevention.
-The framework prioritizes:
-```
-SOCKS_PROXY = {
-    "http": "socks5h://127.0.0.1:9050",
-    "https": "socks5h://127.0.0.1:9050",
-}
-```
-
-```
-sock = socks.socksocket()
-sock.set_proxy(
-    socks.SOCKS5,
-    "127.0.0.1",
-    9050,
-    rdns=True
-)
-```
-
-Using socks5h ensures:
-- remote DNS resolution
-- reduced DNS leak risks
-- improved anonymity consistency
-- Native Tor Validation
-
-The ```--tor``` option includes:
-- automatic Tor routing
-- SOCKS5 proxy enforcement
-- DNS-through-proxy resolution
-- Tor usage verification through TorProject APIs
-
-The framework attempts to prevent common OPSEC mistakes frequently overlooked in offensive tooling.
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/JWT_jwk_injection_output.png" alt="JWT jwk display">
+</div>
 
 
 ### Centralized Request Architecture
@@ -373,15 +415,19 @@ while already minimizing unnecessary requests whenever possible.
 - dangerous HTTP method detection
 - and more...
 
-![Github extraction](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/github_OPSEC.png "Github extraction")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/github_OPSEC.png" alt="Github extraction">
+</div>
 
-![Github OPSEC emails](https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/github_OPSEC_diplay.png "Github OPSEC emails")
+<div align="center">
+  <img src="https://raw.githubusercontent.com/raphaelthief/thiefhunter/refs/heads/main/Screens/github_OPSEC_diplay.png" alt="Github OPSEC emails">
+</div>
 
 
 ## Complete Feature Overview
 ```
 ═══════════════════════════════════════════════════════════════════════
-            Automated Bug Hunting and Pentesting Tool   
+            Automated Bug Hunting and Pentesting Tool 
 ═══════════════════════════════════════════════════════════════════════
 
 Usage:
@@ -442,6 +488,14 @@ PROXY / NETWORK
           - Uses SOCKS5h to avoid DNS leaks
           - If Tor runs on another port, edit:
                 Dependencies/get_request.py
+
+  --notor-api
+      Disable Tor for API requests
+
+      Applies to:
+          - VirusTotal
+          - crt.sh
+          - other external API requests (does not interfer directly with the target)
 
 
 SAVE OPTIONS
@@ -523,6 +577,33 @@ REQUEST CUSTOMIZATION
 
       Default:
           GET
+
+  --delay SECONDS
+      Delay in seconds between each request
+
+      Useful for:
+          - controlling request rate
+          - reducing request frequency
+          - testing rate-limiting behavior
+          - pacing automated requests
+
+      Example:
+          --delay 2
+
+  --concurrency NUMBER
+      Number of concurrent requests
+
+      Useful for:
+          - controlling parallel request execution
+          - adjusting request throughput
+          - testing concurrency handling
+          - tuning performance
+
+      Default:
+          1 (depend on what functions. (eg: 25 for --dir)
+
+      Example:
+          --concurrency 5
 
 
 JWT ANALYSIS
@@ -834,7 +915,7 @@ TCP PORT SCANNER
 
       Performance:
           Configure concurrency:
-              --concurrency 300
+              --concurrency 25
 
           Default:
               150 simultaneous TCP connections
@@ -1044,6 +1125,7 @@ BASIC AUTH FUZZING
       Recommendation:
           Use with --verbose for detailed request attempts and response analysis
 
+
 SSH AUTH FUZZING
 ───────────────────────────────────────────────────────────────────────
  --force-ssh
@@ -1088,6 +1170,98 @@ SSH AUTH FUZZING
       Recommendation:
           Use with --verbose for detailed authentication attempts
           latency measurements and SSH error analysis
+
+
+SMB AUTH FUZZING
+───────────────────────────────────────────────────────────────────────
+ --force-smb
+      Fuzz SMB authentication credentials
+
+      Features:
+          - username/password wordlist support
+          - single credential testing
+          - SOCKS4/SOCKS5 proxy support
+          - Tor SOCKS5 support (--tor)
+          - configurable concurrency (--concurrency)
+          - adaptive delay on connection errors
+          - successful credential detection
+          - authentication, SMB and network error analysis
+          - latency measurement
+          - progress tracking and statistics
+          - result export with --save
+
+      Usage:
+          Supports direct values or files:
+              --user admin
+              --password password
+
+          or wordlists:
+              --user @users.txt
+              --password @passwords.txt
+
+      Options:
+          --port 445
+          --proxy socks5://127.0.0.1:1080
+          --tor
+          --concurrency 5
+
+      Detection:
+          Identifies:
+              - valid SMB credentials
+              - authentication failures
+              - SMB protocol errors
+              - connection resets/timeouts
+              - possible rate limiting or temporary blocking
+
+      Recommendation:
+          Use with --verbose for detailed authentication attempts
+          latency measurements and SMB error analysis
+
+
+FTP AUTH FUZZING
+───────────────────────────────────────────────────────────────────────
+ --force-ftp
+      Fuzz FTP authentication credentials
+
+      Features:
+          - username/password wordlist support
+          - single credential testing
+          - SOCKS4/SOCKS5 proxy support
+          - Tor SOCKS5 support (--tor)
+          - configurable concurrency (--concurrency)
+          - adaptive delay on connection errors
+          - successful credential detection
+          - authentication, FTP and network error analysis
+          - latency measurement
+          - progress tracking and statistics
+          - result export with --save
+
+      Usage:
+          Supports direct values or files:
+              --user admin
+              --password password
+
+          or wordlists:
+              --user @users.txt
+              --password @passwords.txt
+
+      Options:
+          --port 21
+          --proxy socks5://127.0.0.1:1080
+          --tor
+          --concurrency 5
+
+      Detection:
+          Identifies:
+              - valid FTP credentials
+              - authentication failures
+              - FTP protocol errors
+              - connection resets/timeouts
+              - possible rate limiting or temporary blocking
+
+      Recommendation:
+          Use with --verbose for detailed authentication attempts
+          latency measurements and FTP error analysis
 
 
 WORDPRESS FUZZING
