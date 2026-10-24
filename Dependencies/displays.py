@@ -969,6 +969,89 @@ Fuzz VNC authentication credentials
           detected authentication method and WordPress version.
 
 
+{Y}DEFAULT CREDENTIALS
+───────────────────────────────────────────────────────────────────────{G}
+ {C}--search-default{G}
+      Search default login credentials by keyword or list all
+
+      Features:
+          - keyword-based search (-sd zabbix, -sd cisco, -sd xerox)
+          - display all known default credentials (-sd all)
+          - covers network devices, web apps, databases, middleware
+          - organized by vendor/product
+          - includes common admin, default, and factory credentials
+          - auto-generates a wordlist (user:pass) for fuzzing
+            (skipped in --batch mode)
+
+      Usage:
+          Search by product name:
+              -sd zabbix
+              -sd cisco
+              -sd xerox
+
+          Display all:
+              -sd all
+
+      Options:
+          -sd <keyword>    Search credentials matching the keyword
+          -sd all          Display the full credentials database
+
+      Output:
+          - terminal display of matching credentials
+          - wordlist file saved as <keyword>_default_creds.txt
+            format: username:password
+            (not generated in --batch mode)
+
+      Detection:
+          Returns:
+              - username/password pairs
+              - product/vendor name
+              - default or factory credentials
+              - known weak credentials
+
+      Recommendation:
+          Use -sd all to explore available products,
+          then narrow down with a specific keyword for targeted testing.
+          The generated wordlist can be used directly with
+          --password @<keyword>_default_creds.txt for fuzzing.
+
+ {C}--search-pass{G}
+      Auto-detect login page technology and suggest default credentials
+
+      Features:
+          - technology fingerprinting from login page HTML
+          - title-based fast detection
+          - full HTML pattern matching
+          - HTTP header analysis
+          - meta generator extraction
+          - JavaScript redirect following
+          - login page discovery from source code
+          - CGI-bin path fallback
+          - automatic default credential matching
+
+      Usage:
+          Detect and search in one step:
+              -sp -u https://target.com/admin
+              -sp -u https://192.168.1.1/
+
+      Options:
+          -u <url>         Target URL to analyze
+          -sp              Enable auto-detection + credential search
+
+      Detection:
+          Identifies:
+              - CMS (WordPress, Joomla, Drupal, ...)
+              - Network devices (Xerox, Cisco, HP, ...)
+              - Middleware (Apache, Nginx, IIS, ...)
+              - Databases (Zabbix, Grafana, Kibana, ...)
+              - Custom login pages
+
+      Recommendation:
+          Use -sp on any login URL to automatically identify
+          the technology and retrieve matching default credentials.
+          Combine with -sd <keyword> for manual verification.   
+
+
 {Y}AUTOMATION
 ───────────────────────────────────────────────────────────────────────{G}
   {C}--batch{G}
