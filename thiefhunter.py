@@ -37,6 +37,10 @@ from Dependencies.vnc_bruteforce.vnc import dovnc
 from Dependencies.bucket_detection.detect_bucket import dobucket
 from Dependencies.get_request import HAR
 from Dependencies.CrawlURLS.refelcted_injections import reflector
+from Dependencies.default_passwords.update_creds import update_defaults
+from Dependencies.default_passwords.list_accounts import search_default_credentials
+from Dependencies.default_passwords.login_detect import login_detection
+
 
 
 def handle_exit(sig, frame):
@@ -642,6 +646,19 @@ def process_target(args, target_url):
         print(f"{G}[+] {W}Report saved to {datetime.now().strftime("%d-%m-%y-%H-%M.har")}")
 
 
+    # -------------------------
+    # DEFAULT PASSWORDS
+    # -------------------------
+    if local_args.search_default or local_args.search_pass:
+        update_defaults(local_args)
+
+        if local_args.search_default:
+            search_default_credentials(local_args, local_args.search_default)
+
+        if local_args.search_pass:
+            login_detection(local_args)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Automated Bug Hunting and Pentesting Tool")
     parser.add_argument("-hh", action="store_true", help="Show full help menu")
@@ -687,6 +704,8 @@ def main():
     parser.add_argument("--force-smb", action="store_true", help="Attempt SMB authentication bruteforce. Requires --url (target), -U/--user and -P/--password. For anonymous loggin do not provide --username and --password")
     parser.add_argument("--force-ftp", action="store_true", help="Attempt FTP authentication bruteforce. Requires --url (target), -U/--user and -P/--password. For anonymous loggin do not provide --username and --password")
     parser.add_argument("--force-vnc", action="store_true", help="Attempt VNC authentication bruteforce. Requires --url (target), -U/--user and -P/--password. To get Security types do not provide --username and --password and use --verbose")
+    parser.add_argument("--search-default", "-sd", help="Search default login credentials by keyword (-sd zabbix) or display all credentials (-sd all)")
+    parser.add_argument("--search-pass", "-sp", action="store_true", help="Automatically detect the technology from its login page and identify potential default credentials")
     parser.add_argument("-wp", "--wordpress", action="store_true", help="Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.")
     parser.add_argument("-U", "--user", "--username", help="username or @usernames_filepath")
     parser.add_argument("-P", "--password", help="password or @passwords_filepath")
