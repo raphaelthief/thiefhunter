@@ -17,8 +17,9 @@ usage: thiefhunter.py [-h] [-hh] [-nc] [--jwt JWT] [-u URL] [-f FILE] [--random-
                       [-X {GET,POST,PUT,DELETE}] [-e EXTRACT] [-w] [--exclude EXCLUDE] [--show-all] [--reflect REFLECT]
                       [--wtf WTF] [--vln] [--dir {1,2,3,4}] [--exp EXPLOIT_SEARCH] [--audit] [--sub] [--bucket] [--tld]
                       [--trav] [--ord] [--crlf] [--waf] [--favicon] [--tcp-scan] [--ssh-info] [-p PORT] [-c CONCURRENCY]
-                      [--bypass-403] [--basicauth] [--force-ssh] [--force-smb] [--force-ftp] [-wp] [-U USER] [-P PASSWORD]
-                      [--batch] [--save] [--save-burp] [--commits COMMITS]
+                      [--bypass-403] [--basicauth] [--force-ssh] [--force-smb] [--force-ftp] [--force-vnc]
+                      [--search-default SEARCH_DEFAULT] [--search-pass] [-wp] [-U USER] [-P PASSWORD] [--batch] [--save]
+                      [--save-burp] [--commits COMMITS]
 
 Automated Bug Hunting and Pentesting Tool
 
@@ -400,6 +401,20 @@ This architecture also prepares future improvements around:
 - request normalization
 - reduced negotiation overhead
 while already minimizing unnecessary requests whenever possible.
+
+
+### Default passwords DB
+This project relies on the following databases and signatures:
+
+| Source | Usage |
+|--------|-------|
+| [RedSiege/EyeWitness](https://github.com/RedSiege/EyeWitness) | Technology signatures (`signatures.txt`) |
+| [projectdiscovery/nuclei-templates](https://github.com/projectdiscovery/nuclei-templates) | HTTP default-login templates + checksum |
+| [many-passwords/many-passwords](https://github.com/many-passwords/many-passwords) | Default password database (`passwords.csv`) |
+| [ihebski/DefaultCreds-cheat-sheet](https://github.com/ihebski/DefaultCreds-cheat-sheet) | Default credentials cheat sheet |
+| [defaultcredentials.org](https://www.defaultcredentials.org) | Default credentials CSV export API |
+
+All data is downloaded on first run and cached locally.
 
 
 ### Additional Modules
@@ -1370,6 +1385,89 @@ WORDPRESS FUZZING
       Recommendation:
           Use with --verbose to display every endpoint, request,
           detected authentication method and WordPress version.
+
+
+DEFAULT CREDENTIALS
+───────────────────────────────────────────────────────────────────────
+ --search-default
+      Search default login credentials by keyword or list all
+
+      Features:
+          - keyword-based search (-sd zabbix, -sd cisco, -sd xerox)
+          - display all known default credentials (-sd all)
+          - covers network devices, web apps, databases, middleware
+          - organized by vendor/product
+          - includes common admin, default, and factory credentials
+          - auto-generates a wordlist (user:pass) for fuzzing
+            (skipped in --batch mode)
+
+      Usage:
+          Search by product name:
+              -sd zabbix
+              -sd cisco
+              -sd xerox
+
+          Display all:
+              -sd all
+
+      Options:
+          -sd <keyword>    Search credentials matching the keyword
+          -sd all          Display the full credentials database
+
+      Output:
+          - terminal display of matching credentials
+          - wordlist file saved as <keyword>_default_creds.txt
+            format: username:password
+            (not generated in --batch mode)
+
+      Detection:
+          Returns:
+              - username/password pairs
+              - product/vendor name
+              - default or factory credentials
+              - known weak credentials
+
+      Recommendation:
+          Use -sd all to explore available products,
+          then narrow down with a specific keyword for targeted testing.
+          The generated wordlist can be used directly with
+          --password @<keyword>_default_creds.txt for fuzzing.
+
+ --search-pass
+      Auto-detect login page technology and suggest default credentials
+
+      Features:
+          - technology fingerprinting from login page HTML
+          - title-based fast detection
+          - full HTML pattern matching
+          - HTTP header analysis
+          - meta generator extraction
+          - JavaScript redirect following
+          - login page discovery from source code
+          - CGI-bin path fallback
+          - automatic default credential matching
+
+      Usage:
+          Detect and search in one step:
+              -sp -u https://target.com/admin
+              -sp -u https://192.168.1.1/
+
+      Options:
+          -u <url>         Target URL to analyze
+          -sp              Enable auto-detection + credential search
+
+      Detection:
+          Identifies:
+              - CMS (WordPress, Joomla, Drupal, ...)
+              - Network devices (Xerox, Cisco, HP, ...)
+              - Middleware (Apache, Nginx, IIS, ...)
+              - Databases (Zabbix, Grafana, Kibana, ...)
+              - Custom login pages
+
+      Recommendation:
+          Use -sp on any login URL to automatically identify
+          the technology and retrieve matching default credentials.
+          Combine with -sd <keyword> for manual verification.   
 
 
 AUTOMATION
