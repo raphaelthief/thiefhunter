@@ -22,3 +22,5 @@ paramiko
 python-socks
 html5lib
 impacket
+PyYAML
+tabulate
