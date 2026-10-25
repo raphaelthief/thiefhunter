@@ -917,6 +917,45 @@ Fuzz VNC authentication credentials
       and VNC error analysis
 
 
+{Y}RTSP BRUTEFORCE
+───────────────────────────────────────────────────────────────{G}
+ {C}--force-rtsp{G}
+      Fuzz RTSP authentication credentials
+
+      Features:
+          - RTSP DESCRIBE request with Basic Auth
+          - vendor auto-detection via OPTIONS banner
+          - multi-path / multi-channel support
+          - SDP validation (m=video check)
+          - no-auth stream detection
+          - SOCKS5 proxy / Tor support
+          - fuzzing statistics and progress tracking
+
+      Usage:
+          Single target:
+              --force-rtsp -u 192.168.1.100
+              --force-rtsp -u 192.168.1.100/live
+
+          With credentials:
+              --force-rtsp -u 192.168.1.100 -U admin -P pass
+
+          With wordlists:
+              --force-rtsp -u 192.168.1.100 -U @users.txt -P @pass.txt
+
+          Custom paths:
+              --force-rtsp -u 192.168.1.100 --rtsp-path /live
+              --force-rtsp -u 192.168.1.100 --rtsp-path @paths.txt
+
+      Detection:
+          Identifies valid streams based on:
+              - RTSP 200 OK + m=video in SDP
+              - no-auth vs basic-auth distinction
+              - vendor-specific path templates (rtsp.yaml)
+
+      Recommendation:
+          Use with --verbose for detailed SDP output and response analysis
+
+
 {Y}WORDPRESS FUZZING
 ───────────────────────────────────────────────────────────────────────{G}
  {C}--wordpress{G}
