@@ -14,12 +14,13 @@ To see the account menu and the features related to the ```-hh``` menu, scroll t
 ```
 usage: thiefhunter.py [-h] [-hh] [-nc] [--jwt JWT] [-u URL] [-f FILE] [--random-headers] [-v] [--proxy PROXY] [--tor]
                       [--notor-api] [-t TIMEOUT] [--delay DELAY] [--headers HEADERS] [--cookies COOKIES]
-                      [-X {GET,POST,PUT,DELETE}] [-e EXTRACT] [-w] [--exclude EXCLUDE] [--show-all] [--reflect REFLECT]
-                      [--wtf WTF] [--vln] [--dir {1,2,3,4}] [--exp EXPLOIT_SEARCH] [--audit] [--sub] [--bucket] [--tld]
-                      [--trav] [--ord] [--crlf] [--waf] [--favicon] [--tcp-scan] [--ssh-info] [-p PORT] [-c CONCURRENCY]
-                      [--bypass-403] [--basicauth] [--force-ssh] [--force-smb] [--force-ftp] [--force-vnc]
-                      [--search-default SEARCH_DEFAULT] [--search-pass] [-wp] [-U USER] [-P PASSWORD] [--batch] [--save]
-                      [--save-burp] [--commits COMMITS]
+                      [-X {GET,POST,PUT,DELETE}] [-e EXTRACT] [-w] [--exclude EXCLUDE] [--show-all]
+                      [--reflect REFLECT] [--wtf WTF] [--vln] [--dir {1,2,3,4}] [--exp EXPLOIT_SEARCH] [--audit]
+                      [--sub] [--bucket] [--tld] [--trav] [--ord] [--crlf] [--waf] [--favicon] [--tcp-scan]
+                      [--ssh-info] [-p PORT] [-c CONCURRENCY] [--bypass-403] [--basicauth] [--force-ssh] [--force-smb]
+                      [--force-ftp] [--force-vnc] [--force-rtsp] [--rtsp-path RTSP_PATH]
+                      [--search-default SEARCH_DEFAULT] [--search-pass] [-wp] [-U USER] [-P PASSWORD] [--batch]
+                      [--save] [--save-burp] [--commits COMMITS]
 
 Automated Bug Hunting and Pentesting Tool
 
@@ -428,6 +429,7 @@ All data is downloaded on first run and cached locally.
 - security header auditing
 - TLS configuration auditing
 - dangerous HTTP method detection
+- RTSP bruteforce based on pwneye rtsp.yaml file ([original pwneye rtsp file](https://github.com/Hackerest/pwneye/blob/main/pwneye/data/rtsp.yaml))
 - and more...
 
 <div align="center">
@@ -1333,6 +1335,45 @@ Fuzz VNC authentication credentials
       Use with --verbose for detailed security negotiation,
       authentication attempts, latency measurements
       and VNC error analysis
+
+
+RTSP BRUTEFORCE
+───────────────────────────────────────────────────────────────
+ --force-rtsp
+      Fuzz RTSP authentication credentials
+
+      Features:
+          - RTSP DESCRIBE request with Basic Auth
+          - vendor auto-detection via OPTIONS banner
+          - multi-path / multi-channel support
+          - SDP validation (m=video check)
+          - no-auth stream detection
+          - SOCKS5 proxy / Tor support
+          - fuzzing statistics and progress tracking
+
+      Usage:
+          Single target:
+              --force-rtsp -u 192.168.1.100
+              --force-rtsp -u 192.168.1.100/live
+
+          With credentials:
+              --force-rtsp -u 192.168.1.100 -U admin -P pass
+
+          With wordlists:
+              --force-rtsp -u 192.168.1.100 -U @users.txt -P @pass.txt
+
+          Custom paths:
+              --force-rtsp -u 192.168.1.100 --rtsp-path /live
+              --force-rtsp -u 192.168.1.100 --rtsp-path @paths.txt
+
+      Detection:
+          Identifies valid streams based on:
+              - RTSP 200 OK + m=video in SDP
+              - no-auth vs basic-auth distinction
+              - vendor-specific path templates (rtsp.yaml)
+
+      Recommendation:
+          Use with --verbose for detailed SDP output and response analysis
 
 
 WORDPRESS FUZZING
