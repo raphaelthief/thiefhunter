@@ -245,9 +245,9 @@ def get_wordpress_version(args):
     # 2. /feed/
     #
     if args.verbose:
-        print(f'{G}[*] {W}Checking {base}feed/')
+        print(f'{G}[*] {W}Checking {base}/feed/')
         
-    response = get_request(args, f"{base}feed/", timeout=30)
+    response = get_request(args, f"{base}/feed/", timeout=30)
     if valid_response(response) and response.status_code == 200:
 
         match = re.search(r"WordPress\s+([0-9]+(?:\.[0-9]+)+)", response.text, re.I)
@@ -258,9 +258,9 @@ def get_wordpress_version(args):
     # 3. /readme.html
     #
     if args.verbose:
-        print(f'{G}[*] {W}Checking {base}readme.html')
+        print(f'{G}[*] {W}Checking {base}/readme.html')
         
-    response = get_request(args, f"{base}readme.html", timeout=30)
+    response = get_request(args, f"{base}/readme.html", timeout=30)
     if valid_response(response) and response.status_code == 200:
         match = re.search(r"Version\s+([0-9]+(?:\.[0-9]+)+)", response.text, re.I)
         if match:
