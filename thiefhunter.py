@@ -41,6 +41,7 @@ from Dependencies.CrawlURLS.refelcted_injections import reflector
 from Dependencies.default_passwords.update_creds import update_defaults
 from Dependencies.default_passwords.list_accounts import search_default_credentials
 from Dependencies.default_passwords.login_detect import login_detection
+from Dependencies.make_password.passmaker import dopass
 
 
 
@@ -685,6 +686,15 @@ def process_target(args, target_url):
             login_detection(local_args)
 
 
+    # -------------------------
+    # MAKE PASSWORD WORDLIST
+    # -------------------------
+    if local_args.pass_maker:
+        dopass(args)
+
+
+
+
 def main():
     parser = argparse.ArgumentParser(description="Automated Bug Hunting and Pentesting Tool")
     parser.add_argument("-hh", action="store_true", help="Show full help menu")
@@ -722,7 +732,7 @@ def main():
     parser.add_argument("--favicon", action="store_true", help="Try to detect favicon hash")
     parser.add_argument("--tcp-scan", action="store_true", help="TCP scanner compatible with --proxy and --tor. 100 defaults ports scanned if you don't provide --ports. Use --verbose to see filtered and closed ports")
     parser.add_argument("--ssh-info", action="store_true", help="SSH authentications analysis")
-    parser.add_argument("-p", "--port", help="Ports to scan (--port 22,80,443 or --port 1-150) or a list of ports (--port @ports_filepath) or port to connect for --force-ssh (default: 22)")
+    parser.add_argument("-p", "--port", help="Ports to scan (--port 22,80,443 or --port 1-150 or --port all for all existing ports) or a list of ports (--port @ports_filepath) or port to connect for --force-ssh (default: 22)")
     parser.add_argument("-c", "--concurrency", default=None, type=int, help="Setup concurrency for TCP scan (default: 150), --force-ssh (default: 1), --force-smb (default: 1)")
     parser.add_argument("--bypass-403", action="store_true", help="Attempt 403 bypass techniques")
     parser.add_argument("--basicauth", action="store_true", help="Attempt HTTP Basic Authentication. Requires --url (target), -U/--user and -P/--password")
@@ -734,6 +744,7 @@ def main():
     parser.add_argument("--rtsp-path", help="rtsp path or @rtsp_file_path to target")
     parser.add_argument("--search-default", "-sd", help="Search default login credentials by keyword (-sd zabbix) or display all credentials (-sd all)")
     parser.add_argument("--search-pass", "-sp", action="store_true", help="Automatically detect the technology from its login page and identify potential default credentials")
+    parser.add_argument("--pass-maker", "-pm", choices=["limited", "basic", "insane"], help="Generate a password wordlist (level: limited, basic, insane)")
     parser.add_argument("-wp", "--wordpress", action="store_true", help="Enumerate WordPress usernames. With -P/--password, automatically brute-force the discovered usernames. Alternatively, use -U/--user to brute-force a specific username or a list of usernames.")
     parser.add_argument("-U", "--user", "--username", help="username or @usernames_filepath")
     parser.add_argument("-P", "--password", help="password or @passwords_filepath")
@@ -772,6 +783,12 @@ def main():
     if args.tor:
        ensure_tor_or_exit()
 
+    # -------------------------
+    # Full help menu
+    # -------------------------
+    if args.port == "all":
+        args.port = "1-65535"
+        
     if args.file:
         try:
             with open(args.file, "r", encoding="utf-8") as f:
