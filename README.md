@@ -166,6 +166,13 @@ The framework attempts to prevent common OPSEC mistakes frequently overlooked in
 </div>
 
 
+### User-Agent & Blending into Logs
+
+By default, the framework uses a real, common User-Agent (Chrome 121, Windows 10) to blend seamlessly into server logs among legitimate traffic — making requests indistinguishable from a genuine browser.
+
+With the ``--random-headers`` option, a random recent User-Agent (2026) is selected per request from Payloads/user_agents.txt (~150 UAs covering Chrome, Firefox, Safari, Edge, Opera, Samsung Browser across Windows, macOS, Linux, Android, and iOS). This prevents correlation between requests and reduces fingerprinting-based detection.
+
+
 ## HAR BURP SETUP
 
 To use the generated .har file with ``--save-burp``, please configure Burp Suite as follows:
