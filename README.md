@@ -12,15 +12,15 @@ To see the account menu and the features related to the ```-hh``` menu, scroll t
 
 ## Main features
 ```
-usage: thiefhunter.py [-h] [-hh] [-nc] [--jwt JWT] [-u URL] [-f FILE] [--random-headers] [-v] [--proxy PROXY] [--tor]
-                      [--notor-api] [-t TIMEOUT] [--delay DELAY] [--headers HEADERS] [--cookies COOKIES]
-                      [-X {GET,POST,PUT,DELETE}] [-e EXTRACT] [-w] [--exclude EXCLUDE] [--show-all]
-                      [--reflect REFLECT] [--wtf WTF] [--vln] [--dir {1,2,3,4}] [--exp EXPLOIT_SEARCH] [--audit]
-                      [--sub] [--bucket] [--tld] [--trav] [--ord] [--crlf] [--waf] [--favicon] [--tcp-scan]
+usage: thiefhunter.py [-h] [-hh] [-nc] [--jwt JWT] [-u URL] [-f FILE] [--random-headers] [--false-flag FALSE_FLAG]
+                      [-v] [--proxy PROXY] [--tor] [--notor-api] [-t TIMEOUT] [--delay DELAY] [--headers HEADERS]
+                      [--cookies COOKIES] [-X {GET,POST,PUT,DELETE}] [-e EXTRACT] [-w] [--exclude EXCLUDE]
+                      [--show-all] [--reflect REFLECT] [--wtf WTF] [--vln] [--dir {1,2,3,4}] [--exp EXPLOIT_SEARCH]
+                      [--audit] [--sub] [--bucket] [--tld] [--trav] [--ord] [--crlf] [--waf] [--favicon] [--tcp-scan]
                       [--ssh-info] [-p PORT] [-c CONCURRENCY] [--bypass-403] [--basicauth] [--force-ssh] [--force-smb]
                       [--force-ftp] [--force-vnc] [--force-rtsp] [--rtsp-path RTSP_PATH]
-                      [--search-default SEARCH_DEFAULT] [--search-pass] [-wp] [-U USER] [-P PASSWORD] [--batch]
-                      [--save] [--save-burp] [--commits COMMITS]
+                      [--search-default SEARCH_DEFAULT] [--search-pass] [--pass-maker {limited,basic,insane}] [-wp]
+                      [-U USER] [-P PASSWORD] [--batch] [--save] [--save-burp] [--commits COMMITS]
 
 Automated Bug Hunting and Pentesting Tool
 
@@ -171,6 +171,11 @@ The framework attempts to prevent common OPSEC mistakes frequently overlooked in
 By default, the framework uses a real, common User-Agent (Chrome 121, Windows 10) to blend seamlessly into server logs among legitimate traffic — making requests indistinguishable from a genuine browser.
 
 With the ``--random-headers`` option, a random recent User-Agent (2026) is selected per request from Payloads/user_agents.txt (~150 UAs covering Chrome, Firefox, Safari, Edge, Opera, Samsung Browser across Windows, macOS, Linux, Android, and iOS). This prevents correlation between requests and reduces fingerprinting-based detection.
+
+With ``--false-flag <country>``, the framework introduces False Flag Attack Simulation, allowing operators to emulate an HTTP identity associated with a selected country or regional profile.
+Supported profiles: ru, cn, us, ph, ir, br, in, de, tr.
+
+Priority: --false-flag takes precedence over --random-headers when both are specified.
 
 
 ## HAR BURP SETUP
@@ -589,6 +594,32 @@ REQUEST CUSTOMIZATION
 
       Example:
           --headers "Authorization=Bearer TOKEN,Accept=application/json"
+
+    --false-flag <country>
+        Apply a predefined regional HTTP header profile
+
+        Supported countries:
+            - ru (Russia)
+            - cn (China)
+            - us (United States)
+            - ph (Philippines)
+            - ir (Iran)
+            - br (Brazil)
+            - in (India)
+            - de (Germany)
+            - tr (Turkey)
+
+        Useful for:
+            - simulating an attacker operating under a false flag
+            - testing attribution and fingerprinting mechanisms
+            - evaluating regional detection capabilities
+            - testing locale-based server responses
+            - assessing security monitoring and detection rules
+
+        Note:
+            - Uses predefined regional HTTP header profiles
+            - Takes priority over --random-headers
+            - Changes HTTP headers, not the actual source IP or location
 
   -c, --cookies "name=value,name2=value2"
       Custom cookies
