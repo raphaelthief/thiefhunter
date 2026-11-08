@@ -703,6 +703,7 @@ def main():
     parser.add_argument("-u", "--url", help="Target URL to scan")
     parser.add_argument("-f", "--file", help="Targets URL to scan from file")
     parser.add_argument("--random-headers", action="store_true", help="Use random User-Agent for each requests from the header file (paylaods) instead of default one")
+    parser.add_argument("--false-flag", default=None, help="Aviable country: ru, cn, us, ph, ir, br, in, de, tr")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable Verbose mode")
     parser.add_argument("--proxy", help="Custom proxy (--proxy http://user:pass@host:port)")
     parser.add_argument("--tor", action="store_true", help="Force use of Tor SOCKSH proxy (127.0.0.1:9050)")
