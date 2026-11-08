@@ -5,7 +5,7 @@ from tqdm import tqdm
 from datetime import datetime
 from Dependencies.displays import M, W, R, Y, G, C, handle_error
 from Dependencies.save_output import HARRecorder
-
+from Dependencies.False_flag.False_flag import get_false_flag_headers, FALSE_FLAG_PROFILES
 
 # =========================================================
 # Rate limiting or WAF detection for enumerations (Connection aborted errors)
@@ -33,7 +33,6 @@ UA_FILE = BASE_DIR / "Payloads" / "user_agents.txt"
 
 HAR = HARRecorder(datetime.now().strftime("%d-%m-%y-%H-%M.har"))
 
-
 def load_user_agents(path=UA_FILE):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -44,9 +43,17 @@ def load_user_agents(path=UA_FILE):
 
 USER_AGENTS = load_user_agents()
 
+
+
 def build_headers(args):
     headers = DEFAULT_HEADERS.copy()
+    
+    # --- FALSE FLAG / LOCALE ---
+    country = getattr(args, "false_flag", None)
+    if country:
+        headers.update(get_false_flag_headers(country))
 
+    # --- CUSTOM HEADERS ---
     parsed_headers = parse_headers(args.headers)
     headers.update(parsed_headers)
     extra_headers = {}
@@ -55,7 +62,7 @@ def build_headers(args):
     headers.update(extra_headers)
 
     # --- RANDOM USER AGENT ---
-    if getattr(args, "random_headers", False):
+    if getattr(args, "random_headers", False) and not getattr(args, "false_flag", None):
         if USER_AGENTS:
             headers["User-Agent"] = random.choice(USER_AGENTS)
     return headers
