@@ -157,6 +157,32 @@ GENERAL OPTIONS
           - testing detection capabilities
           - reducing correlation between requests
 
+    {C}--false-flag <country>{G}
+        Apply a predefined regional HTTP header profile
+
+        Supported countries:
+            - ru (Russia)
+            - cn (China)
+            - us (United States)
+            - ph (Philippines)
+            - ir (Iran)
+            - br (Brazil)
+            - in (India)
+            - de (Germany)
+            - tr (Turkey)
+
+        Useful for:
+            - simulating an attacker operating under a false flag
+            - testing attribution and fingerprinting mechanisms
+            - evaluating regional detection capabilities
+            - testing locale-based server responses
+            - assessing security monitoring and detection rules
+
+        Note:
+            - Uses predefined regional HTTP header profiles
+            - Takes priority over --random-headers
+            - Changes HTTP headers, not the actual source IP or location
+
   {C}--headers "Header=Value,Header2=Value2"{G}
       Custom HTTP headers
 
